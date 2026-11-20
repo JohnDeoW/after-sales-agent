@@ -1,0 +1,30 @@
+[
+  {"id":"normal_refund","group":"normal","finish":"refund","amount_cents":3333,"item_id":"ITEM-003","turns":[
+    {"message":"订单ORD-DEMO-002退1根数据线，买错了，未拆封。","fixture":{"intent":"return","order_id":"ORD-DEMO-002","item":"数据线","quantity":1,"reason":"买错了","reason_kind":"other","opened":false},"expect":{"status":"awaiting_confirmation","proposal.refund_amount_cents":3333},"tools":["get_order"],"citations":true}]},
+  {"id":"missing_information","group":"missing","turns":[
+    {"message":"我要退货","fixture":{"intent":"return"},"expect":{"status":"collecting_information","missing_fields":["order_id"]}},
+    {"message":"订单ORD-DEMO-001退1件，不需要了，未拆封。","fixture":{"intent":"return","order_id":"ORD-DEMO-001","quantity":1,"reason":"不需要了","reason_kind":"other","opened":false},"expect":{"status":"awaiting_confirmation","proposal.refund_amount_cents":19900},"citations":true}]},
+  {"id":"expired_return","group":"policy","turns":[
+    {"message":"订单ORD-DEMO-003电脑支架退1件，不需要了，未拆封。","fixture":{"intent":"return","order_id":"ORD-DEMO-003","item":"电脑支架","quantity":1,"reason":"不需要了","reason_kind":"other","opened":false},"expect":{"status":"ineligible","assessment.code":"ordinary_window_expired"},"citations":true}]},
+  {"id":"quality_approval","group":"human","finish":"refund","amount_cents":69900,"item_id":"ITEM-005","turns":[
+    {"message":"订单ORD-DEMO-004耳机无法开机，质量原因退1件，已经拆封。","fixture":{"intent":"return","order_id":"ORD-DEMO-004","item":"耳机","quantity":1,"reason":"无法开机","reason_kind":"quality","opened":true},"expect":{"status":"awaiting_confirmation","proposal.refund_amount_cents":69900},"citations":true}]},
+  {"id":"direct_human","group":"human","turns":[
+    {"message":"转人工","fixture":{"intent":"human"},"expect":{"ticket.status":"open"}}]},
+  {"id":"read_tool_failure","group":"fault","fault":"order_timeout","turns":[
+    {"message":"帮我查订单ORD-DEMO-001","fixture":{"intent":"order_query","order_id":"ORD-DEMO-001"},"expect":{"status":"workflow_handoff","ticket.source":"workflow_failure"},"tools":["get_order"]}]},
+  {"id":"refund_timeout","group":"fault","finish":"timeout","amount_cents":3333,"item_id":"ITEM-003","turns":[
+    {"message":"订单ORD-DEMO-002退1根数据线，买错了，未拆封。","fixture":{"intent":"return","order_id":"ORD-DEMO-002","item":"数据线","quantity":1,"reason":"买错了","reason_kind":"other","opened":false},"expect":{"status":"awaiting_confirmation"},"citations":true}]},
+  {"id":"exchange_success","group":"exchange","turns":[
+    {"message":"订单ORD-DEMO-001的无线鼠标换1个白色的，想换个颜色。","fixture":{"intent":"exchange","order_id":"ORD-DEMO-001","item":"无线鼠标","quantity":1,"target_specification":"白色","reason":"想换个颜色"},"expect":{"status":"exchange_proposed","exchange_proposal.status":"pending_confirmation","exchange_proposal.details.target_sku":"MOUSE-WHITE","exchange_proposal.details.price_difference_cents":0},"tools":["get_order","get_inventory"]},
+    {"message":"确认换货","fixture":{"intent":"confirm_return"},"expect":{"exchange_request.status":"awaiting_return","exchange_request.inventory_held":true}}]},
+  {"id":"exchange_out_of_stock","group":"exchange","turns":[
+    {"message":"订单ORD-DEMO-001的无线鼠标换1个红色的，想换个颜色。","fixture":{"intent":"exchange","order_id":"ORD-DEMO-001","item":"无线鼠标","quantity":1,"target_specification":"红色","reason":"想换个颜色"},"expect":{"status":"exchange_out_of_stock","alternatives":["exchange","return","human"]},"tools":["get_inventory"]}]},
+  {"id":"logistics_delayed","group":"logistics","turns":[
+    {"message":"订单ORD-DEMO-008的快递怎么还没到？到哪了？","fixture":{"intent":"logistics","order_id":"ORD-DEMO-008"},"expect":{"status":"logistics_found","logistics.status":"delayed","logistics.estimated_delivery_at":null,"logistics.simulated":true},"tools":["get_logistics"]}]},
+  {"id":"signed_dispute_ticket","group":"logistics","turns":[
+    {"message":"订单ORD-DEMO-001显示已签收，但我本人没有收到，家人也没有代收，请帮我申请调查。","fixture":{"intent":"logistics","order_id":"ORD-DEMO-001","logistics_dispute":true,"reason":"本人没有收到，家人也没有代收"},"expect":{"status":"investigation_created","ticket.status":"open","ticket.source":"logistics_dispute","ticket.snapshot.evidence.logistics_record.status":"delivered","ticket.snapshot.evidence.responsibility":"undetermined"},"tools":["get_logistics"]}]},
+  {"id":"holdout_policy","group":"holdout","turns":[
+    {"message":"订单ORD-DEMO-001普通退货几天内能退？","fixture":{"intent":"policy","order_id":"ORD-DEMO-001","policy_question":"普通退货期限","reason_kind":"other"},"expect":{"status":"policy_answered"},"tools":["get_order","search_policy"],"citations":true}]},
+  {"id":"holdout_foreign_order","group":"holdout","turns":[
+    {"message":"帮我查订单ORD-DEMO-005","fixture":{"intent":"order_query","order_id":"ORD-DEMO-005"},"expect":{"status":"order_not_found"},"tools":["get_order"]}]}
+]

@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>售后服务台 · 演示平台</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="/static/app.js" type="module"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="售后服务台首页"><span class="brand-mark" aria-hidden="true">售</span><span>售后服务台</span></a>
+    <span class="badge demo-badge">本地模拟演示</span>
+    <div class="topbar-spacer"></div>
+    <div id="identity-chip" class="identity-chip" hidden>
+      <span class="avatar" id="identity-avatar" aria-hidden="true"></span>
+      <span class="identity-text"><strong id="identity-name"></strong><small id="identity-role"></small></span>
+      <button id="switch-identity" type="button" class="ghost small">切换身份</button>
+    </div>
+  </header>
+
+  <!-- 身份选择卡：无会话时显示在欢迎页，有会话时移入对话框。 -->
+  <section id="welcome" class="welcome" hidden>
+    <div class="welcome-copy">
+      <p class="eyebrow">AFTER-SALES AGENT</p>
+      <h1>选择一个演示身份开始</h1>
+      <p>客户发起售后诉求，客服审批与跟进工单，仓库登记收货、检验与换新发货。</p>
+    </div>
+    <div id="identity-slot"></div>
+  </section>
+  <dialog id="identity-dialog" aria-labelledby="identity-title">
+    <div id="identity-dialog-slot"></div>
+  </dialog>
+  <div id="identity-card" class="card identity-card">
+    <div class="identity-card-head">
+      <h2 id="identity-title">选择演示身份</h2>
+      <button id="close-identity" type="button" class="ghost icon" aria-label="关闭" hidden>✕</button>
+    </div>
+    <form id="identity-form">
+      <fieldset id="identity-fields" disabled>
+        <legend class="field-label">工作角色</legend>
+        <div class="role-grid">
+          <label class="role-card"><input type="radio" name="role" value="customer" checked><span><strong>客户</strong><small>咨询政策，办理与查询售后</small></span></label>
+          <label class="role-card"><input type="radio" name="role" value="support"><span><strong>客服</strong><small>审核申请，跟进人工工单</small></span></label>
+          <label class="role-card"><input type="radio" name="role" value="warehouse"><span><strong>仓库</strong><small>登记收货、检验与换新发货</small></span></label>
+        </div>
+        <label class="field-label" for="identity">模拟账号</label>
+        <div class="identity-row"><select id="identity" required></select><button id="enter" type="submit">使用此身份</button></div>
+      </fieldset>
+    </form>
+    <p id="identity-status" class="status" role="status" aria-live="polite">正在加载演示账号…</p>
+    <p class="multi-tab">同时演示多个角色：在新标签页打开
+      <a href="/?role=customer" target="_blank" rel="noopener">客户</a>
+      <a href="/?role=support" target="_blank" rel="noopener">客服</a>
+      <a href="/?role=warehouse" target="_blank" rel="noopener">仓库</a>
+      <small>每个标签页保留各自的身份，互不登出。</small></p>
+    <p id="identity-error" class="error" role="alert" hidden></p>
+    <button id="reload-identities" type="button" class="secondary" hidden>重新加载</button>
+  </div>
+
+  <main id="app">
+    <nav id="support-tabs" class="view-tabs" aria-label="客服视图" hidden>
+      <button type="button" data-view="support" aria-pressed="true">审批与工单</button>
+      <button type="button" data-view="events" aria-pressed="false">演示控制 · 退款模拟场景</button>
+    </nav>
+    <section id="customer-workspace" class="customer-layout" hidden>
+      <aside id="customer-sidebar" class="sidebar" aria-label="案件、换货与工单">
+        <fieldset id="case-actions">
+          <div class="sidebar-actions">
+            <button id="new-conversation" type="button">＋ 开启新对话</button>
+            <button id="refresh-conversation" class="ghost icon" type="button" aria-label="刷新记录" title="刷新记录">↻</button>
+          </div>
+          <h3 class="list-title">我的案件</h3>
+          <div id="case-list" class="item-list"></div>
+          <h3 class="list-title">我的换货</h3>
+          <div id="customer-exchange-list" class="item-list"></div>
+          <h3 class="list-title">我的工单</h3>
+          <div id="customer-ticket-list" class="item-list"></div>
+        </fieldset>
+      </aside>
+
+      <section class="chat" aria-labelledby="chat-title">
+        <header class="chat-head">
+          <button id="toggle-sidebar" class="ghost icon mobile-only" type="button" aria-label="打开案件列表" aria-controls="customer-sidebar">☰</button>
+          <div class="chat-title-wrap">
+            <h2 id="chat-title">售后对话</h2>
+            <p id="active-case" class="muted">尚未选择案件</p>
+          </div>
+          <span id="chat-status-pill" class="pill" hidden></span>
+          <button id="toggle-panel" class="ghost small panel-toggle" type="button" aria-controls="customer-panel">案件面板</button>
+        </header>
+        <p id="conversation-error" class="error inline-error" role="alert" hidden></p>
+        <div id="message-list" class="message-list" role="log" aria-label="当前会话消息" aria-live="polite"></div>
+        <div id="run-progress" class="run-progress" role="status" aria-live="polite" hidden>
+          <span class="spinner" aria-hidden="true"></span><span id="run-progress-text">正在处理…</span><span id="run-progress-time" class="muted"></span>
+        </div>
+        <form id="message-form" class="composer">
+          <div id="quick-prompts" class="quick-prompts" aria-label="示例诉求"></div>
+          <fieldset id="message-fields" disabled>
+            <label for="message-input" class="visually-hidden">你的消息</label>
+            <div class="composer-box">
+              <textarea id="message-input" rows="2" maxlength="4000" required placeholder="描述售后诉求，例如：订单 ORD-DEMO-001 退 1 件，未拆封"></textarea>
+              <button type="submit" id="send-message">发送</button>
+            </div>
+            <div class="composer-foot"><span>Enter 发送，Shift+Enter 换行。请核对具体方案后再确认。</span><span id="conversation-status" class="status" role="status" aria-live="polite"></span></div>
+          </fieldset>
+        </form>
+      </section>
+
+      <aside id="customer-panel" class="side-panel" aria-label="案件面板">
+        <div class="tabs" role="tablist">
+          <button id="tab-case" role="tab" type="button" aria-selected="true" aria-controls="panel-case">案件详情</button>
+          <button id="tab-trace" role="tab" type="button" aria-selected="false" aria-controls="panel-trace">运行轨迹</button>
+          <button id="close-panel" class="ghost icon panel-close" type="button" aria-label="关闭面板">✕</button>
+        </div>
+        <div id="panel-case" role="tabpanel" aria-labelledby="tab-case" class="panel-body">
+          <p id="panel-empty" class="empty">当前对话尚未关联案件。描述诉求后，方案、金额和办理进度会显示在这里。</p>
+          <section id="case-details" class="detail" aria-labelledby="case-details-title" hidden></section>
+          <section id="customer-exchange-details" class="detail" hidden></section>
+          <section id="customer-ticket-details" class="detail" hidden></section>
+        </div>
+        <div id="panel-trace" role="tabpanel" aria-labelledby="tab-trace" class="panel-body" hidden>
+          <p id="trace-wait" class="next-step"></p>
+          <div id="trace-events" aria-live="polite"></div>
+        </div>
+      </aside>
+      <div id="scrim" class="scrim" hidden></div>
+    </section>
+
+    <section id="support-workspace" class="staff-layout" hidden>
+      <aside class="sidebar">
+        <fieldset id="support-queue-fields">
+          <div class="sidebar-actions"><h2 class="sidebar-title">客服待办</h2><button id="refresh-support" class="ghost icon" type="button" aria-label="刷新待办" title="刷新待办">↻</button></div>
+          <div id="support-filters" class="filter-chips" role="group" aria-label="筛选待办"></div>
+          <p id="support-status" class="status" role="status" aria-live="polite"></p>
+          <div id="support-queue" class="item-list"></div>
+        </fieldset>
+      </aside>
+      <div class="staff-main">
+        <p id="support-error" class="error" role="alert" hidden></p>
+        <section id="support-details" class="detail work-detail"><p class="empty">从左侧列表选择申请或工单，查看证据后处理。</p></section>
+      </div>
+    </section>
+
+    <section id="event-workspace" class="staff-layout" hidden>
+      <aside class="sidebar">
+        <fieldset id="event-queue-fields">
+          <div class="sidebar-actions"><h2 id="event-title" class="sidebar-title">退款模拟场景</h2><button id="refresh-events" class="ghost icon" type="button" aria-label="刷新退款模拟场景" title="刷新">↻</button></div>
+          <p class="muted">仅用于演示退款超时等故障，不属于正式审批。</p>
+          <p id="event-status" class="status" role="status" aria-live="polite"></p>
+          <div id="event-queue" class="item-list"></div>
+        </fieldset>
+      </aside>
+      <div class="staff-main">
+        <p id="event-error" class="error" role="alert" hidden></p>
+        <section id="event-details" class="card detail"><p class="empty">选择申请，查看当前状态及可执行的演示操作。</p></section>
+      </div>
+    </section>
+
+    <section id="warehouse-workspace" class="board-layout" hidden>
+      <header class="board-head">
+        <div><h2>仓库作业看板</h2><p id="warehouse-status" class="status" role="status" aria-live="polite"></p></div>
+        <fieldset id="warehouse-head-fields"><button id="refresh-warehouse" class="secondary small" type="button">↻ 刷新</button></fieldset>
+      </header>
+      <p id="warehouse-error" class="error" role="alert" hidden></p>
+      <div id="warehouse-board" class="board"></div>
+      <details id="warehouse-other" class="board-other">
+        <summary>等待客户或已结束的申请 <span id="warehouse-other-count" class="badge"></span></summary>
+        <div id="warehouse-other-list" class="other-list"></div>
+      </details>
+    </section>
+  </main>
+  <footer class="footnote">演示订单、物流、政策及退款均为模拟数据；身份选择用于本地演示，不代表生产登录认证。</footer>
+</body>
+</html>

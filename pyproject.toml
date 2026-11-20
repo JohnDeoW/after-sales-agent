@@ -1,0 +1,34 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "after-sales-agent"
+version = "0.1.0"
+description = "商品售后服务 Agent 应用"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+    "fastapi>=0.115,<1",
+    "uvicorn>=0.30,<1",
+    "python-dotenv>=1.0,<2",
+    "langchain-openai>=1.7.2",
+    "langgraph>=1,<2",
+]
+
+[project.scripts]
+after-sales-api = "after_sales.main:run"
+after-sales-model-check = "after_sales.model_check:run"
+after-sales-init-db = "after_sales.storage.seed:run"
+after-sales-policy-index = "after_sales.retrieval.index:run"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/after_sales"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
