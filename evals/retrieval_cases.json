@@ -1,0 +1,2271 @@
+{
+ "notice": "检索评测样例；期望条款为 clause_id 或 clause_id@version（需核对版本时）。全部为虚构演示。",
+ "rewritten_by": "gpt-6.2-sol（IntakeUpdate.policy_question，识别时的检索问法）",
+ "cases": [
+  {
+   "id": "R01",
+   "question": "鼠标买了不喜欢，签收3天了还能退吗",
+   "rewritten": "普通退货期限",
+   "context": {
+    "sku": "MOUSE-BLACK",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-RETURN-WINDOW@demo-v1"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "退货",
+    "reason": "不喜欢",
+    "reason_kind": "other",
+    "product": "数码配件",
+    "order": [
+     "单商品",
+     "期限内"
+    ],
+    "difficulty": [
+     "口语化"
+    ]
+   },
+   "note": "口语化询问普通退货期限，需召回新版退货期限",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "R02",
+   "question": "九月中旬买的键盘，现在退货是几天期限",
+   "rewritten": "普通退货期限",
+   "context": {
+    "sku": "KEYBOARD-WHITE",
+    "ordered_on": "2026-09-15",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-RETURN-WINDOW@demo-v0"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "退货",
+    "reason": "不想要",
+    "reason_kind": "other",
+    "product": "数码配件",
+    "order": [
+     "跨版本"
+    ],
+    "difficulty": [
+     "版本敏感",
+     "口语化"
+    ]
+   },
+   "note": "旧订单应召回历史版本5天规则，不能用新版",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "R03",
+   "question": "数据线买错长度了，第7天还能退不",
+   "rewritten": "普通退货期限",
+   "context": {
+    "sku": "CABLE-1M",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-RETURN-WINDOW@demo-v1"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "退货",
+    "reason": "买错规格",
+    "reason_kind": "other",
+    "product": "数码配件",
+    "order": [
+     "多件",
+     "临界"
+    ],
+    "difficulty": [
+     "口语化",
+     "简写"
+    ]
+   },
+   "note": "临界日期的退货期限，问法口语且省略主语",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "R04",
+   "question": "羽绒服尺码买大了，收货十天了可以退吗",
+   "rewritten": "签收十天后是否仍在普通退货期限内",
+   "context": {
+    "sku": "JACKET-DOWN-L",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-RETURN-WINDOW-APPAREL@demo-v1"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "退货",
+    "reason": "买错尺码",
+    "reason_kind": "other",
+    "product": "服装鞋包",
+    "order": [
+     "期限内"
+    ],
+    "difficulty": [
+     "口语化"
+    ]
+   },
+   "note": "服装专属退货期限，不能误用数码配件的7天规则",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "R05",
+   "question": "9月10号下单的T恤，签收第10天还能退吗",
+   "rewritten": "普通退货期限：签收第10天还能退吗",
+   "context": {
+    "sku": "TSHIRT-COTTON-M",
+    "ordered_on": "2026-09-10",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-RETURN-WINDOW-APPAREL@demo-v0"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "退货",
+    "reason": "不想要",
+    "reason_kind": "other",
+    "product": "服装鞋包",
+    "order": [
+     "跨版本",
+     "超期"
+    ],
+    "difficulty": [
+     "版本敏感"
+    ]
+   },
+   "note": "服装旧版7天规则，第10天已超期",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "R06",
+   "question": "跑鞋穿出去跑了一次觉得不合脚能退吗",
+   "rewritten": "跑鞋户外试穿使用后因不合脚能否普通退货",
+   "context": {
+    "sku": "SHOES-RUN-42",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-TRIAL-APPAREL"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "退货",
+    "reason": "买错尺码",
+    "reason_kind": "other",
+    "product": "服装鞋包",
+    "order": [
+     "已使用"
+    ],
+    "difficulty": [
+     "相近条款易混淆",
+     "口语化"
+    ]
+   },
+   "note": "穿着外出属于已使用，区别于室内试穿",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "R07",
+   "question": "衣服在家试穿了一下不合适，能退吗",
+   "rewritten": "衣服试穿后因不合适能否退货",
+   "context": {
+    "sku": "TSHIRT-COTTON-M",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-TRIAL-APPAREL"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "退货",
+    "reason": "买错尺码",
+    "reason_kind": "other",
+    "product": "服装鞋包",
+    "order": [
+     "已试用"
+    ],
+    "difficulty": [
+     "口语化"
+    ]
+   },
+   "note": "试穿规则，需与拆封条款区分",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "R08",
+   "question": "耳机拆开听了一下音质一般想退",
+   "rewritten": "耳机拆开听了一下音质一般想退",
+   "context": {
+    "sku": "HEADPHONE-BLACK",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-OPENED-AUDIO"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "退货",
+    "reason": "不喜欢",
+    "reason_kind": "other",
+    "product": "数码配件",
+    "order": [
+     "已拆封"
+    ],
+    "difficulty": [
+     "相近条款易混淆",
+     "口语化"
+    ]
+   },
+   "note": "试听算拆封，应召回耳机拆封条款而非配件条款",
+   "rewritten_intent": "return"
+  },
+  {
+   "id": "R09",
+   "question": "键盘拆了包装没用，还可以七天无理由吗",
+   "rewritten": "七天无理由退货的拆封限制",
+   "context": {
+    "sku": "KEYBOARD-WHITE",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-OPENED-ACCESSORIES",
+    "DEMO-RETURN-WINDOW"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "退货",
+    "reason": "不想要",
+    "reason_kind": "other",
+    "product": "数码配件",
+    "order": [
+     "已拆封"
+    ],
+    "difficulty": [
+     "多条款",
+     "简写"
+    ]
+   },
+   "note": "“七天无理由”简写，需同时召回拆封限制与退货期限",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "R10",
+   "question": "空气炸锅只开箱看了眼没插电，能退吗",
+   "rewritten": "拆封限制",
+   "context": {
+    "sku": "AIRFRYER-4L",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-OPENED-APPLIANCE",
+    "DEMO-RETURN-WINDOW-APPLIANCE"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "退货",
+    "reason": "不想要",
+    "reason_kind": "other",
+    "product": "家电",
+    "order": [
+     "已拆封未使用"
+    ],
+    "difficulty": [
+     "多条款",
+     "相近条款易混淆"
+    ]
+   },
+   "note": "家电拆包检查不等于使用",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "R11",
+   "question": "电水壶烧过一次水了还能七天无理由退吗",
+   "rewritten": "电水壶使用一次后是否适用七天无理由退货",
+   "context": {
+    "sku": "KETTLE-1L",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-RETURN-WINDOW-APPLIANCE"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "退货",
+    "reason": "不想要",
+    "reason_kind": "other",
+    "product": "家电",
+    "order": [
+     "已使用"
+    ],
+    "difficulty": [
+     "简写",
+     "口语化"
+    ]
+   },
+   "note": "已通电使用的家电不能普通退货",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "R12",
+   "question": "口红拆开试色了，不喜欢颜色能退吗",
+   "rewritten": "拆封限制",
+   "context": {
+    "sku": "LIPSTICK-RED",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-TRIAL-BEAUTY"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "退货",
+    "reason": "不喜欢",
+    "reason_kind": "other",
+    "product": "个护美妆",
+    "order": [
+     "已试用"
+    ],
+    "difficulty": [
+     "相近条款易混淆"
+    ]
+   },
+   "note": "美妆试用后不退，与服装试穿规则相反",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "R13",
+   "question": "精华没拆封，买重复了想退一瓶",
+   "rewritten": "精华没拆封，买重复了想退一瓶",
+   "context": {
+    "sku": "SERUM-30ML",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-TRIAL-BEAUTY"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "退货",
+    "reason": "重复下单",
+    "reason_kind": "other",
+    "product": "个护美妆",
+    "order": [
+     "多件",
+     "未拆封"
+    ],
+    "difficulty": [
+     "口语化"
+    ]
+   },
+   "note": "美妆未拆封的退货期限",
+   "rewritten_intent": "return"
+  },
+  {
+   "id": "R14",
+   "question": "坚果开袋吃了几颗不好吃能退吗",
+   "rewritten": "坚果拆封并食用后因不喜欢口味能否退货（拆封限制）",
+   "context": {
+    "sku": "NUTS-MIX-500G",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-FOOD-RETURN",
+    "DEMO-NON-RETURNABLE"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "退货",
+    "reason": "不喜欢",
+    "reason_kind": "other",
+    "product": "食品",
+    "order": [
+     "已拆封"
+    ],
+    "difficulty": [
+     "多条款",
+     "口语化"
+    ]
+   },
+   "note": "已拆封食品不支持普通退货",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "R16",
+   "question": "内衣套装拆了不合身可以退吗",
+   "rewritten": "拆封限制",
+   "context": {
+    "sku": "UNDERWEAR-SET",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-NON-RETURNABLE"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "退货",
+    "reason": "买错尺码",
+    "reason_kind": "other",
+    "product": "特殊不退",
+    "order": [
+     "已拆封"
+    ],
+    "difficulty": [
+     "口语化"
+    ]
+   },
+   "note": "贴身衣物拆封后不退",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "R17",
+   "question": "礼品卡买多了能退吗",
+   "rewritten": "礼品卡是否可以退货",
+   "context": {
+    "sku": "GIFTCARD-100",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-NON-RETURNABLE"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "退货",
+    "reason": "重复下单",
+    "reason_kind": "other",
+    "product": "特殊不退",
+    "order": [
+     "单商品"
+    ],
+    "difficulty": [
+     "口语化"
+    ]
+   },
+   "note": "虚拟商品不支持普通退货",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "R18",
+   "question": "定制照片杯印好了我不想要了",
+   "rewritten": "定制照片杯印好了我不想要了",
+   "context": {
+    "sku": "MUG-CUSTOM-PHOTO",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-CUSTOM-NO-RETURN"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "预售与定制",
+    "reason": "不想要",
+    "reason_kind": "other",
+    "product": "定制",
+    "order": [
+     "单商品"
+    ],
+    "difficulty": [
+     "口语化"
+    ]
+   },
+   "note": "定制商品非质量问题不退",
+   "rewritten_intent": "return"
+  },
+  {
+   "id": "R19",
+   "question": "退回去的东西你们怎么验货，配件丢了一个还能退吗",
+   "rewritten": "退货验货流程及缺少一个配件是否影响退货资格",
+   "context": {
+    "sku": "MOUSE-BLACK",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-RETURN-COMPLETE",
+    "DEMO-RETURN-INSPECTION"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "退货",
+    "reason": "不想要",
+    "reason_kind": "other",
+    "product": "数码配件",
+    "order": [
+     "配件不全"
+    ],
+    "difficulty": [
+     "多条款",
+     "口语化"
+    ]
+   },
+   "note": "退回完整性与检验标准两条",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "R20",
+   "question": "收货三个多月了还能申请售后吗",
+   "rewritten": "售后申请期限",
+   "context": {
+    "sku": "POWERBANK-10K",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-AFTERSALE-DEADLINE"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "退货",
+    "reason": "不想要",
+    "reason_kind": "other",
+    "product": "数码配件",
+    "order": [
+     "超期"
+    ],
+    "difficulty": [
+     "口语化"
+    ]
+   },
+   "note": "售后总期限90天",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "R21",
+   "question": "数据线买了三根已经退了一根，再退一根钱怎么算",
+   "rewritten": "同一商品购买三件，已退一件后再退一件的退款金额计算规则",
+   "context": {
+    "sku": "CABLE-1M",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-REFUND-AMOUNT"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "退款方式与到账时效",
+    "reason": "不想要",
+    "reason_kind": "other",
+    "product": "数码配件",
+    "order": [
+     "多件",
+     "部分已退"
+    ],
+    "difficulty": [
+     "口语化"
+    ]
+   },
+   "note": "部分退货的金额分摊",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "Q01",
+   "question": "耳机用了两周右耳没声音了",
+   "rewritten": "耳机用了两周右耳没声音了",
+   "context": {
+    "sku": "HEADPHONE-BLACK",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "quality"
+   },
+   "expected": [
+    "DEMO-QUALITY"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "退货",
+    "reason": "质量故障",
+    "reason_kind": "quality",
+    "product": "数码配件",
+    "order": [
+     "已使用",
+     "期限内"
+    ],
+    "difficulty": [
+     "口语化"
+    ]
+   },
+   "note": "签收30日内质量问题进入人工审核",
+   "rewritten_intent": "repair"
+  },
+  {
+   "id": "Q02",
+   "question": "扫地机器人第二天就开不了机",
+   "rewritten": "扫地机器人第二天就开不了机",
+   "context": {
+    "sku": "VACUUM-ROBOT",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "quality"
+   },
+   "expected": [
+    "DEMO-QUALITY-DOA"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "退货",
+    "reason": "质量故障",
+    "reason_kind": "quality",
+    "product": "家电",
+    "order": [
+     "期限内"
+    ],
+    "difficulty": [
+     "口语化",
+     "同义改写"
+    ]
+   },
+   "note": "开箱即坏，不出现“故障”字样",
+   "rewritten_intent": "repair"
+  },
+  {
+   "id": "Q03",
+   "question": "快递箱子破了，电水壶摔出一个坑",
+   "rewritten": "快递箱子破了，电水壶摔出一个坑",
+   "context": {
+    "sku": "KETTLE-1L",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "quality"
+   },
+   "expected": [
+    "DEMO-DAMAGED-IN-TRANSIT"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "退货",
+    "reason": "到货破损",
+    "reason_kind": "quality",
+    "product": "家电",
+    "order": [
+     "单商品"
+    ],
+    "difficulty": [
+     "口语化"
+    ]
+   },
+   "note": "到货破损48小时内反馈",
+   "rewritten_intent": "unknown"
+  },
+  {
+   "id": "Q04",
+   "question": "收到的套装里少了一支笔",
+   "rewritten": "收到的套装里少了一支笔",
+   "context": {
+    "sku": "GIFT-SET-DESK",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "quality"
+   },
+   "expected": [
+    "DEMO-MISSING-PARTS"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "退货",
+    "reason": "少件漏发",
+    "reason_kind": "quality",
+    "product": "套装",
+    "order": [
+     "套装"
+    ],
+    "difficulty": [
+     "口语化",
+     "同义改写"
+    ]
+   },
+   "note": "少件漏发补发，不出现“漏发”字样",
+   "rewritten_intent": "unknown"
+  },
+  {
+   "id": "Q05",
+   "question": "下单黑色键盘结果发来白色",
+   "rewritten": "下单黑色键盘结果发来白色",
+   "context": {
+    "sku": "KEYBOARD-WHITE",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "quality"
+   },
+   "expected": [
+    "DEMO-WRONG-ITEM"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "退货",
+    "reason": "错发",
+    "reason_kind": "quality",
+    "product": "数码配件",
+    "order": [
+     "单商品"
+    ],
+    "difficulty": [
+     "同义改写"
+    ]
+   },
+   "note": "错发由商家承担运费",
+   "rewritten_intent": "unknown"
+  },
+  {
+   "id": "Q06",
+   "question": "衣服跟图片差太多了，面料完全不一样",
+   "rewritten": "衣服跟图片差太多了，面料完全不一样",
+   "context": {
+    "sku": "TSHIRT-COTTON-M",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "quality"
+   },
+   "expected": [
+    "DEMO-NOT-AS-DESCRIBED"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "退货",
+    "reason": "与描述不符",
+    "reason_kind": "quality",
+    "product": "服装鞋包",
+    "order": [
+     "单商品"
+    ],
+    "difficulty": [
+     "同义改写",
+     "口语化"
+    ]
+   },
+   "note": "与描述不符需人工认定",
+   "rewritten_intent": "return"
+  },
+  {
+   "id": "Q07",
+   "question": "用了精华脸上起红疹",
+   "rewritten": "用了精华脸上起红疹",
+   "context": {
+    "sku": "SERUM-30ML",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "quality"
+   },
+   "expected": [
+    "DEMO-ALLERGY"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "退货",
+    "reason": "过敏",
+    "reason_kind": "quality",
+    "product": "个护美妆",
+    "order": [
+     "已使用"
+    ],
+    "difficulty": [
+     "同义改写"
+    ]
+   },
+   "note": "过敏不适需就医记录",
+   "rewritten_intent": "unknown"
+  },
+  {
+   "id": "Q08",
+   "question": "报质量问题要准备什么材料",
+   "rewritten": "质量问题申报所需材料",
+   "context": {
+    "sku": "MOUSE-BLACK",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "quality"
+   },
+   "expected": [
+    "DEMO-QUALITY-EVIDENCE"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "退货",
+    "reason": "质量故障",
+    "reason_kind": "quality",
+    "product": "数码配件",
+    "order": [
+     "单商品"
+    ],
+    "difficulty": [
+     "口语化"
+    ]
+   },
+   "note": "质量问题材料要求",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "Q09",
+   "question": "坚果里吃出异物了",
+   "rewritten": "坚果里吃出异物了",
+   "context": {
+    "sku": "NUTS-MIX-500G",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "quality"
+   },
+   "expected": [
+    "DEMO-FOOD-RETURN"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "退货",
+    "reason": "质量故障",
+    "reason_kind": "quality",
+    "product": "食品",
+    "order": [
+     "已拆封"
+    ],
+    "difficulty": [
+     "相近条款易混淆"
+    ]
+   },
+   "note": "食品异物按质量问题，不受拆封限制",
+   "rewritten_intent": "unknown"
+  },
+  {
+   "id": "Q10",
+   "question": "鼠标签收40天了出现双击问题能退吗",
+   "rewritten": "签收40天后出现双击故障，是否符合质量问题退货条件",
+   "context": {
+    "sku": "MOUSE-BLACK",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "quality"
+   },
+   "expected": [
+    "DEMO-QUALITY",
+    "DEMO-WARRANTY-DIGITAL"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "维修与保修",
+    "reason": "质量故障",
+    "reason_kind": "quality",
+    "product": "数码配件",
+    "order": [
+     "超期"
+    ],
+    "difficulty": [
+     "多条款"
+    ]
+   },
+   "note": "超出30天质量审核期后转保修",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "Q11",
+   "question": "质保期内的充电宝鼓包了",
+   "rewritten": "质保期内的充电宝鼓包了",
+   "context": {
+    "sku": "POWERBANK-10K",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "quality"
+   },
+   "expected": [
+    "DEMO-WARRANTY-DIGITAL"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "维修与保修",
+    "reason": "质量故障",
+    "reason_kind": "quality",
+    "product": "数码配件",
+    "order": [
+     "已使用"
+    ],
+    "difficulty": [
+     "同义改写"
+    ]
+   },
+   "note": "质保即保修",
+   "rewritten_intent": "repair"
+  },
+  {
+   "id": "E01",
+   "question": "鞋子小了一码想换大一码",
+   "rewritten": "鞋子小了一码想换大一码",
+   "context": {
+    "sku": "SHOES-RUN-42",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-EXCHANGE-SIZE",
+    "DEMO-EXCHANGE-SAME-SPEC"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "换货",
+    "reason": "买错尺码",
+    "reason_kind": "other",
+    "product": "服装鞋包",
+    "order": [
+     "单商品"
+    ],
+    "difficulty": [
+     "多条款",
+     "口语化"
+    ]
+   },
+   "note": "服装换码与同款换货",
+   "rewritten_intent": "exchange"
+  },
+  {
+   "id": "E02",
+   "question": "鼠标想换个白色的",
+   "rewritten": "鼠标想换个白色的",
+   "context": {
+    "sku": "MOUSE-BLACK",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-EXCHANGE-SAME-SPEC@demo-v1"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "换货",
+    "reason": "不喜欢",
+    "reason_kind": "other",
+    "product": "数码配件",
+    "order": [
+     "单商品"
+    ],
+    "difficulty": [
+     "口语化"
+    ]
+   },
+   "note": "同款换颜色，新版15天",
+   "rewritten_intent": "exchange"
+  },
+  {
+   "id": "E03",
+   "question": "九月初买的耳机现在能换颜色吗",
+   "rewritten": "换货期限及是否支持更换颜色",
+   "context": {
+    "sku": "HEADPHONE-BLACK",
+    "ordered_on": "2026-09-05",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-EXCHANGE-SAME-SPEC@demo-v0"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "换货",
+    "reason": "不喜欢",
+    "reason_kind": "other",
+    "product": "数码配件",
+    "order": [
+     "跨版本"
+    ],
+    "difficulty": [
+     "版本敏感"
+    ]
+   },
+   "note": "旧订单的换货期限为7天",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "E04",
+   "question": "想换的颜色没货了怎么办",
+   "rewritten": "换货目标规格缺货处理",
+   "context": {
+    "sku": "KEYBOARD-WHITE",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-EXCHANGE-STOCK"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "换货",
+    "reason": "不喜欢",
+    "reason_kind": "other",
+    "product": "数码配件",
+    "order": [
+     "单商品"
+    ],
+    "difficulty": [
+     "口语化"
+    ]
+   },
+   "note": "换货缺货处理",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "E05",
+   "question": "能不能补点钱换成专业版鼠标",
+   "rewritten": "能不能补点钱换成专业版鼠标",
+   "context": {
+    "sku": "MOUSE-BLACK",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-EXCHANGE-PRICE-DIFF"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "换货",
+    "reason": "不喜欢",
+    "reason_kind": "other",
+    "product": "数码配件",
+    "order": [
+     "单商品"
+    ],
+    "difficulty": [
+     "同义改写"
+    ]
+   },
+   "note": "补差价换货不支持",
+   "rewritten_intent": "exchange"
+  },
+  {
+   "id": "E06",
+   "question": "衣服已经换过一次码了，还能再换吗",
+   "rewritten": "已换码一次后能否再次换货",
+   "context": {
+    "sku": "TSHIRT-COTTON-M",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-EXCHANGE-SIZE"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "换货",
+    "reason": "买错尺码",
+    "reason_kind": "other",
+    "product": "服装鞋包",
+    "order": [
+     "单商品"
+    ],
+    "difficulty": [
+     "口语化"
+    ]
+   },
+   "note": "免费换码限一次",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "W01",
+   "question": "空气炸锅保修几年",
+   "rewritten": "空气炸锅保修期限",
+   "context": {
+    "sku": "AIRFRYER-4L",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "quality"
+   },
+   "expected": [
+    "DEMO-WARRANTY-APPLIANCE@demo-v1"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "维修与保修",
+    "reason": "质量故障",
+    "reason_kind": "quality",
+    "product": "家电",
+    "order": [
+     "单商品"
+    ],
+    "difficulty": [
+     "版本敏感"
+    ]
+   },
+   "note": "新订单家电保修2年",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "W02",
+   "question": "八月买的电水壶保修多久",
+   "rewritten": "保修期限",
+   "context": {
+    "sku": "KETTLE-1L",
+    "ordered_on": "2026-08-20",
+    "reason_kind": "quality"
+   },
+   "expected": [
+    "DEMO-WARRANTY-APPLIANCE@demo-v0"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "维修与保修",
+    "reason": "质量故障",
+    "reason_kind": "quality",
+    "product": "家电",
+    "order": [
+     "跨版本"
+    ],
+    "difficulty": [
+     "版本敏感",
+     "口语化"
+    ]
+   },
+   "note": "旧订单家电保修1年",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "W03",
+   "question": "耳机保修期多长",
+   "rewritten": "耳机保修期限",
+   "context": {
+    "sku": "EARBUDS-PRO",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "quality"
+   },
+   "expected": [
+    "DEMO-WARRANTY-DIGITAL"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "维修与保修",
+    "reason": "质量故障",
+    "reason_kind": "quality",
+    "product": "数码配件",
+    "order": [
+     "单商品"
+    ],
+    "difficulty": [
+     "简写"
+    ]
+   },
+   "note": "数码配件保修1年",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "W04",
+   "question": "扫地机进水了还保修吗",
+   "rewritten": "商品进水是否属于保修范围",
+   "context": {
+    "sku": "VACUUM-ROBOT",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "quality"
+   },
+   "expected": [
+    "DEMO-WARRANTY-EXCLUSIONS"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "维修与保修",
+    "reason": "质量故障",
+    "reason_kind": "quality",
+    "product": "家电",
+    "order": [
+     "已使用"
+    ],
+    "difficulty": [
+     "简写"
+    ]
+   },
+   "note": "进水不在免费保修范围",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "W05",
+   "question": "过了保修期还能修吗",
+   "rewritten": "过保维修政策",
+   "context": {
+    "sku": "KETTLE-1L",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "quality"
+   },
+   "expected": [
+    "DEMO-REPAIR-PAID"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "维修与保修",
+    "reason": "质量故障",
+    "reason_kind": "quality",
+    "product": "家电",
+    "order": [
+     "超期"
+    ],
+    "difficulty": [
+     "口语化"
+    ]
+   },
+   "note": "过保付费维修",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "W06",
+   "question": "寄修要多久能修好",
+   "rewritten": "寄修要多久能修好",
+   "context": {
+    "sku": "AIRFRYER-4L",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "quality"
+   },
+   "expected": [
+    "DEMO-REPAIR-PROCESS"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "维修与保修",
+    "reason": "质量故障",
+    "reason_kind": "quality",
+    "product": "家电",
+    "order": [
+     "单商品"
+    ],
+    "difficulty": [
+     "口语化"
+    ]
+   },
+   "note": "维修流程与时效",
+   "rewritten_intent": "repair"
+  },
+  {
+   "id": "S01",
+   "question": "退货运费谁出",
+   "rewritten": "退货运费承担",
+   "context": {
+    "sku": "MOUSE-BLACK",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-SHIPPING",
+    "DEMO-SHIPPING-INSURANCE"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "运费",
+    "reason": "不想要",
+    "reason_kind": "other",
+    "product": "数码配件",
+    "order": [
+     "单商品"
+    ],
+    "difficulty": [
+     "多条款",
+     "简写"
+    ]
+   },
+   "note": "普通退货运费的两条相关条款",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "S02",
+   "question": "质量问题退回来运费能报销吗",
+   "rewritten": "质量问题退货运费报销",
+   "context": {
+    "sku": "HEADPHONE-BLACK",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "quality"
+   },
+   "expected": [
+    "DEMO-RETURN-SHIPPING-QUALITY"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "运费",
+    "reason": "质量故障",
+    "reason_kind": "quality",
+    "product": "数码配件",
+    "order": [
+     "单商品"
+    ],
+    "difficulty": [
+     "相近条款易混淆"
+    ]
+   },
+   "note": "质量问题寄回运费由商家承担",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "S03",
+   "question": "我买了运费险，退货怎么理赔",
+   "rewritten": "运费险退货理赔",
+   "context": {
+    "sku": "TSHIRT-COTTON-M",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-SHIPPING-INSURANCE"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "运费",
+    "reason": "不想要",
+    "reason_kind": "other",
+    "product": "服装鞋包",
+    "order": [
+     "单商品"
+    ],
+    "difficulty": [
+     "口语化"
+    ]
+   },
+   "note": "退货运费险理赔",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "S04",
+   "question": "退款会把原来的邮费一起退吗",
+   "rewritten": "退货退款是否包含原订单运费",
+   "context": {
+    "sku": "CABLE-1M",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-SHIPPING"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "运费",
+    "reason": "不想要",
+    "reason_kind": "other",
+    "product": "数码配件",
+    "order": [
+     "单商品"
+    ],
+    "difficulty": [
+     "同义改写"
+    ]
+   },
+   "note": "邮费即运费，原订单运费不退",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "F01",
+   "question": "退款多久到账",
+   "rewritten": "退款到账时间",
+   "context": {
+    "sku": "MOUSE-BLACK",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-REFUND-TIMING"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "退款方式与到账时效",
+    "reason": "不想要",
+    "reason_kind": "other",
+    "product": "数码配件",
+    "order": [
+     "单商品"
+    ],
+    "difficulty": [
+     "相近条款易混淆"
+    ]
+   },
+   "note": "到账时效，不同于退货期限",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "F02",
+   "question": "钱退到哪里，能退到微信吗",
+   "rewritten": "退款到账方式（是否支持退到微信）",
+   "context": {
+    "sku": "KEYBOARD-WHITE",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-REFUND-METHOD"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "退款方式与到账时效",
+    "reason": "不想要",
+    "reason_kind": "other",
+    "product": "数码配件",
+    "order": [
+     "单商品"
+    ],
+    "difficulty": [
+     "口语化",
+     "同义改写"
+    ]
+   },
+   "note": "原路退回",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "F03",
+   "question": "退货后积分会退回来吗",
+   "rewritten": "退货后积分是否退回",
+   "context": {
+    "sku": "TSHIRT-COTTON-M",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-REFUND-POINTS-COUPON"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "退款方式与到账时效",
+    "reason": "不想要",
+    "reason_kind": "other",
+    "product": "服装鞋包",
+    "order": [
+     "单商品"
+    ],
+    "difficulty": [
+     "口语化"
+    ]
+   },
+   "note": "积分与优惠券退还",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "F04",
+   "question": "没发货能直接退款吗",
+   "rewritten": "未发货订单退款",
+   "context": {
+    "sku": "AIRFRYER-4L",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-REFUND-ONLY"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "退款方式与到账时效",
+    "reason": "不想要",
+    "reason_kind": "other",
+    "product": "家电",
+    "order": [
+     "未发货"
+    ],
+    "difficulty": [
+     "同义改写"
+    ]
+   },
+   "note": "仅退款不退货",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "F05",
+   "question": "我已经寄回去了，什么时候才给我退钱",
+   "rewritten": "我已经寄回去了，什么时候才给我退钱",
+   "context": {
+    "sku": "MOUSE-BLACK",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-REFUND-CONDITIONS"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "退款方式与到账时效",
+    "reason": "不想要",
+    "reason_kind": "other",
+    "product": "数码配件",
+    "order": [
+     "已寄回"
+    ],
+    "difficulty": [
+     "相近条款易混淆",
+     "口语化"
+    ]
+   },
+   "note": "退款执行条件，易与到账时效混淆",
+   "rewritten_intent": "return_query"
+  },
+  {
+   "id": "F06",
+   "question": "退款超过500要审批吗",
+   "rewritten": "退款金额超过500是否需要审批",
+   "context": {
+    "sku": "HEADPHONE-BLACK",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-APPROVAL"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "退款方式与到账时效",
+    "reason": "不想要",
+    "reason_kind": "other",
+    "product": "数码配件",
+    "order": [
+     "单商品"
+    ],
+    "difficulty": [
+     "简写"
+    ]
+   },
+   "note": "金额审批门槛",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "F07",
+   "question": "用了满减，退款金额怎么算",
+   "rewritten": "使用满减优惠时的退款金额计算",
+   "context": {
+    "sku": "KEYBOARD-WHITE",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-REFUND-AMOUNT",
+    "DEMO-DISCOUNT-ALLOCATION"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "价保与优惠分摊",
+    "reason": "不想要",
+    "reason_kind": "other",
+    "product": "数码配件",
+    "order": [
+     "多商品"
+    ],
+    "difficulty": [
+     "多条款"
+    ]
+   },
+   "note": "退款金额与优惠分摊",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "F08",
+   "question": "退款到帐要几天",
+   "rewritten": "退款到账时效",
+   "context": {
+    "sku": "MOUSE-BLACK",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-REFUND-TIMING"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "退款方式与到账时效",
+    "reason": "不想要",
+    "reason_kind": "other",
+    "product": "数码配件",
+    "order": [
+     "单商品"
+    ],
+    "difficulty": [
+     "错别字"
+    ]
+   },
+   "note": "“到帐”错别字",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "P01",
+   "question": "刚买三天就降价了能退差价吗",
+   "rewritten": "降价补差价政策",
+   "context": {
+    "sku": "EARBUDS-PRO",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-PRICE-PROTECTION"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "价保与优惠分摊",
+    "reason": "价格变动",
+    "reason_kind": "other",
+    "product": "数码配件",
+    "order": [
+     "期限内"
+    ],
+    "difficulty": [
+     "同义改写",
+     "口语化"
+    ]
+   },
+   "note": "退差价即价格保护",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "P02",
+   "question": "直播间更便宜了能价保吗",
+   "rewritten": "直播间降价是否适用价保",
+   "context": {
+    "sku": "LIPSTICK-RED",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-PRICE-PROTECTION-EXCLUSIONS"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "价保与优惠分摊",
+    "reason": "价格变动",
+    "reason_kind": "other",
+    "product": "个护美妆",
+    "order": [
+     "单商品"
+    ],
+    "difficulty": [
+     "相近条款易混淆"
+    ]
+   },
+   "note": "直播专享不参与价保",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "P03",
+   "question": "满减买的，退一件剩下的不够满减了要补钱吗",
+   "rewritten": "满减订单部分退货后的优惠差额补款规则",
+   "context": {
+    "sku": "TSHIRT-COTTON-M",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-DISCOUNT-ALLOCATION"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "价保与优惠分摊",
+    "reason": "不想要",
+    "reason_kind": "other",
+    "product": "服装鞋包",
+    "order": [
+     "多商品",
+     "部分退货"
+    ],
+    "difficulty": [
+     "口语化"
+    ]
+   },
+   "note": "不追缴已享优惠",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "P04",
+   "question": "保价怎么申请",
+   "rewritten": "保价申请流程",
+   "context": {
+    "sku": "EARBUDS-PRO",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-PRICE-PROTECTION"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "价保与优惠分摊",
+    "reason": "价格变动",
+    "reason_kind": "other",
+    "product": "数码配件",
+    "order": [
+     "单商品"
+    ],
+    "difficulty": [
+     "同义改写",
+     "错别字"
+    ]
+   },
+   "note": "“保价”与“价保”",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "G01",
+   "question": "送的赠品我用了，主商品还能退吗",
+   "rewritten": "赠品已使用时主商品是否仍可退货",
+   "context": {
+    "sku": "AIRFRYER-4L",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-GIFT-RETURN"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "赠品与套装",
+    "reason": "不想要",
+    "reason_kind": "other",
+    "product": "家电",
+    "order": [
+     "含赠品",
+     "已使用"
+    ],
+    "difficulty": [
+     "口语化"
+    ]
+   },
+   "note": "赠品已使用扣除价值",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "G02",
+   "question": "桌面套装只想退里面的台灯",
+   "rewritten": "桌面套装只想退里面的台灯",
+   "context": {
+    "sku": "GIFT-SET-DESK",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-BUNDLE-PARTIAL"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "赠品与套装",
+    "reason": "不想要",
+    "reason_kind": "other",
+    "product": "套装",
+    "order": [
+     "套装",
+     "部分退货"
+    ],
+    "difficulty": [
+     "口语化"
+    ]
+   },
+   "note": "套装不可拆分退",
+   "rewritten_intent": "return"
+  },
+  {
+   "id": "B01",
+   "question": "预售的键盘定金能退吗",
+   "rewritten": "预售键盘定金是否可退",
+   "context": {
+    "sku": "KEYBOARD-PRESALE",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-PRESALE-DEPOSIT"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "预售与定制",
+    "reason": "不想要",
+    "reason_kind": "other",
+    "product": "预售",
+    "order": [
+     "单商品"
+    ],
+    "difficulty": [
+     "口语化"
+    ]
+   },
+   "note": "预售定金不退",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "B02",
+   "question": "预售说好上周发货到现在还没发",
+   "rewritten": "预售说好上周发货到现在还没发",
+   "context": {
+    "sku": "KEYBOARD-PRESALE",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-PRESALE-DELAY"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "预售与定制",
+    "reason": "不想要",
+    "reason_kind": "other",
+    "product": "预售",
+    "order": [
+     "未发货"
+    ],
+    "difficulty": [
+     "口语化",
+     "相近条款易混淆"
+    ]
+   },
+   "note": "预售延期，易与物流延迟混淆",
+   "rewritten_intent": "logistics"
+  },
+  {
+   "id": "L01",
+   "question": "快递超时好几天了还没到",
+   "rewritten": "快递超时好几天了还没到",
+   "context": {
+    "sku": "MOUSE-BLACK",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-LOGISTICS-DELAY"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "物流异常",
+    "reason": null,
+    "reason_kind": "other",
+    "product": "数码配件",
+    "order": [
+     "未签收"
+    ],
+    "difficulty": [
+     "口语化",
+     "同义改写"
+    ]
+   },
+   "note": "物流延迟补偿",
+   "rewritten_intent": "logistics"
+  },
+  {
+   "id": "L02",
+   "question": "显示已签收但我没收到",
+   "rewritten": "显示已签收但我没收到",
+   "context": {
+    "sku": "KEYBOARD-WHITE",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-SIGNED-NOT-RECEIVED"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "物流异常",
+    "reason": null,
+    "reason_kind": "other",
+    "product": "数码配件",
+    "order": [
+     "已签收"
+    ],
+    "difficulty": [
+     "口语化"
+    ]
+   },
+   "note": "签收未收到需调查",
+   "rewritten_intent": "logistics"
+  },
+  {
+   "id": "L03",
+   "question": "物流一个星期没更新了，是不是丢件了",
+   "rewritten": "物流一个星期没更新了，是不是丢件了",
+   "context": {
+    "sku": "HEADPHONE-BLACK",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-LOGISTICS-LOST"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "物流异常",
+    "reason": null,
+    "reason_kind": "other",
+    "product": "数码配件",
+    "order": [
+     "未签收"
+    ],
+    "difficulty": [
+     "口语化"
+    ]
+   },
+   "note": "轨迹中断超过7天",
+   "rewritten_intent": "logistics"
+  },
+  {
+   "id": "L04",
+   "question": "快递员送来的箱子破了我能拒收吗",
+   "rewritten": "快递外包装破损时能否拒收",
+   "context": {
+    "sku": "KETTLE-1L",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-REJECT-DELIVERY"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "物流异常",
+    "reason": "到货破损",
+    "reason_kind": "other",
+    "product": "家电",
+    "order": [
+     "未签收"
+    ],
+    "difficulty": [
+     "口语化",
+     "相近条款易混淆"
+    ]
+   },
+   "note": "拒收规则，易与到货破损混淆",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "I01",
+   "question": "发票怎么开，能开专票吗",
+   "rewritten": "发票怎么开，能开专票吗",
+   "context": {
+    "sku": "KEYBOARD-WHITE",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-INVOICE-ISSUE"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "发票",
+    "reason": null,
+    "reason_kind": "other",
+    "product": "数码配件",
+    "order": [
+     "单商品"
+    ],
+    "difficulty": [
+     "简写"
+    ]
+   },
+   "note": "“专票”简写",
+   "rewritten_intent": "unknown"
+  },
+  {
+   "id": "I02",
+   "question": "退货了发票要寄回吗",
+   "rewritten": "退货时发票是否需要寄回",
+   "context": {
+    "sku": "AIRFRYER-4L",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-INVOICE-RETURN"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "发票",
+    "reason": "不想要",
+    "reason_kind": "other",
+    "product": "家电",
+    "order": [
+     "单商品"
+    ],
+    "difficulty": [
+     "口语化"
+    ]
+   },
+   "note": "退货时的发票处理",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "I03",
+   "question": "发漂抬头写错了能改吗",
+   "rewritten": "发漂抬头写错了能改吗",
+   "context": {
+    "sku": "MOUSE-BLACK",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-INVOICE-ISSUE"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "发票",
+    "reason": null,
+    "reason_kind": "other",
+    "product": "数码配件",
+    "order": [
+     "单商品"
+    ],
+    "difficulty": [
+     "错别字"
+    ]
+   },
+   "note": "“发漂”错别字",
+   "rewritten_intent": "unknown"
+  },
+  {
+   "id": "C01",
+   "question": "人工客服几点上班",
+   "rewritten": "人工客服服务时间",
+   "context": {
+    "sku": "MOUSE-BLACK",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [
+    "DEMO-SERVICE-CHANNEL"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "人工服务渠道",
+    "reason": null,
+    "reason_kind": "other",
+    "product": "数码配件",
+    "order": [
+     "单商品"
+    ],
+    "difficulty": [
+     "口语化"
+    ]
+   },
+   "note": "人工服务时间",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "C02",
+   "question": "对审核结果不服可以申诉吗",
+   "rewritten": "审核结果申诉",
+   "context": {
+    "sku": "HEADPHONE-BLACK",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "quality"
+   },
+   "expected": [
+    "DEMO-SERVICE-ESCALATION"
+   ],
+   "answerable": true,
+   "tags": {
+    "intent": "人工服务渠道",
+    "reason": "质量故障",
+    "reason_kind": "quality",
+    "product": "数码配件",
+    "order": [
+     "单商品"
+    ],
+    "difficulty": [
+     "同义改写"
+    ]
+   },
+   "note": "申诉即复核",
+   "rewritten_intent": "quality_dispute"
+  },
+  {
+   "id": "N01",
+   "question": "可以以旧换新吗",
+   "rewritten": "是否支持以旧换新",
+   "context": {
+    "sku": "MOUSE-BLACK",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [],
+   "answerable": false,
+   "tags": {
+    "intent": "换货",
+    "reason": null,
+    "reason_kind": "other",
+    "product": "数码配件",
+    "order": [
+     "单商品"
+    ],
+    "difficulty": [
+     "无依据"
+    ]
+   },
+   "note": "政策未覆盖以旧换新",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "N02",
+   "question": "空气炸锅能预约上门安装吗",
+   "rewritten": "空气炸锅能预约上门安装吗",
+   "context": {
+    "sku": "AIRFRYER-4L",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [],
+   "answerable": false,
+   "tags": {
+    "intent": "维修与保修",
+    "reason": null,
+    "reason_kind": "other",
+    "product": "家电",
+    "order": [
+     "单商品"
+    ],
+    "difficulty": [
+     "无依据",
+     "相近条款易混淆"
+    ]
+   },
+   "note": "政策未覆盖上门安装，“安装”易误命中家电退货条款",
+   "rewritten_intent": "unknown"
+  },
+  {
+   "id": "N03",
+   "question": "海外直邮要交关税吗",
+   "rewritten": "海外直邮关税",
+   "context": {
+    "sku": "SERUM-30ML",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [],
+   "answerable": false,
+   "tags": {
+    "intent": "运费",
+    "reason": null,
+    "reason_kind": "other",
+    "product": "个护美妆",
+    "order": [
+     "单商品"
+    ],
+    "difficulty": [
+     "无依据"
+    ]
+   },
+   "note": "政策未覆盖关税",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "N04",
+   "question": "会员年费能退吗",
+   "rewritten": "会员年费退款政策",
+   "context": {
+    "sku": "MOUSE-BLACK",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [],
+   "answerable": false,
+   "tags": {
+    "intent": "退款方式与到账时效",
+    "reason": null,
+    "reason_kind": "other",
+    "product": "数码配件",
+    "order": [
+     "单商品"
+    ],
+    "difficulty": [
+     "无依据"
+    ]
+   },
+   "note": "政策未覆盖会员费",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "N05",
+   "question": "可以分期免息付款吗",
+   "rewritten": "分期免息付款",
+   "context": {
+    "sku": "VACUUM-ROBOT",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [],
+   "answerable": false,
+   "tags": {
+    "intent": "退款方式与到账时效",
+    "reason": null,
+    "reason_kind": "other",
+    "product": "家电",
+    "order": [
+     "单商品"
+    ],
+    "difficulty": [
+     "无依据"
+    ]
+   },
+   "note": "政策未覆盖分期",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "N06",
+   "question": "能去门店自提吗",
+   "rewritten": "门店自提",
+   "context": {
+    "sku": "TSHIRT-COTTON-M",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [],
+   "answerable": false,
+   "tags": {
+    "intent": "物流异常",
+    "reason": null,
+    "reason_kind": "other",
+    "product": "服装鞋包",
+    "order": [
+     "单商品"
+    ],
+    "difficulty": [
+     "无依据"
+    ]
+   },
+   "note": "政策未覆盖自提",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "N07",
+   "question": "宠物用品能托运吗",
+   "rewritten": "宠物用品托运规定",
+   "context": {
+    "sku": "MOUSE-BLACK",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [],
+   "answerable": false,
+   "tags": {
+    "intent": "物流异常",
+    "reason": null,
+    "reason_kind": "other",
+    "product": "数码配件",
+    "order": [
+     "单商品"
+    ],
+    "difficulty": [
+     "无依据"
+    ]
+   },
+   "note": "政策未覆盖托运",
+   "rewritten_intent": "policy"
+  },
+  {
+   "id": "N08",
+   "question": "耳机能不能刻字",
+   "rewritten": "耳机能不能刻字",
+   "context": {
+    "sku": "HEADPHONE-BLACK",
+    "ordered_on": "2026-10-20",
+    "reason_kind": "other"
+   },
+   "expected": [],
+   "answerable": false,
+   "tags": {
+    "intent": "预售与定制",
+    "reason": null,
+    "reason_kind": "other",
+    "product": "数码配件",
+    "order": [
+     "单商品"
+    ],
+    "difficulty": [
+     "无依据",
+     "相近条款易混淆"
+    ]
+   },
+   "note": "政策未覆盖刻字服务，易误命中定制条款",
+   "rewritten_intent": "unknown"
+  }
+ ]
+}

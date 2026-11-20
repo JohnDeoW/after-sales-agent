@@ -1,4 +1,4 @@
-"""统一回放入口：离线预设和真实模型共用业务路径，分别保存机器结果。"""
+"""统一评测入口：场景回放（离线预设 / 真实模型）与检索评测（retrieval，不调用模型），分别保存机器结果。"""
 
 import argparse
 import csv
@@ -136,10 +136,16 @@ def finish_refund(client, request, proposal, scenario, result):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--mode", choices=["offline", "live"], default="offline")
+    parser.add_argument("--mode", choices=["offline", "live", "retrieval"], default="offline")
     parser.add_argument("--select", default="core", help="core / all / 组名 / 场景ID，多个值用逗号分隔；holdout为独立检查组")
     parser.add_argument("--list", action="store_true")
+    parser.add_argument("--query", choices=["original", "rewritten", "both"], default="both",
+                        help="检索评测的输入：用户原话、模型改写问法或两者都跑")
+    parser.add_argument("--refresh-rewrites", action="store_true",
+                        help="检索评测前用真实识别模型重新生成改写问法并写回评测集（会产生模型调用）")
     args = parser.parse_args()
+    if args.mode == "retrieval":
+        return run_retrieval(args)
     scenarios = json.loads(Path(__file__).with_name("scenarios.json").read_text(encoding="utf-8"))
     if args.list:
         for s in scenarios: print(s["id"], s["group"])
@@ -165,6 +171,34 @@ def main():
         writer.writeheader(); writer.writerows(report["results"])
     print("机器结果：", directory)
     return 0 if all(r["passed"] for r in report["results"]) else 1
+
+
+def run_retrieval(args) -> int:
+    from retrieval_eval import evaluate, load_cases, log_phoenix_experiment, refresh_rewrites, write_results
+    if args.refresh_rewrites:
+        print("已生成改写问法：", refresh_rewrites(), "条", flush=True)
+    data = load_cases()
+    directory = PROJECT_ROOT / "artifacts" / ("retrieval-" + datetime.now().strftime("%Y%m%d-%H%M%S") + "-" + secrets.token_hex(3))
+    directory.mkdir(parents=True)
+    index = directory / "policies.sqlite3"
+    rebuild_index(index_path=index)
+    fields = {"original": ["question"], "rewritten": ["rewritten"], "both": ["question", "rewritten"]}[args.query]
+    if "rewritten" in fields and not all(case["rewritten"] for case in data["cases"]):
+        raise SystemExit("评测集尚无改写问法，请先加 --refresh-rewrites 生成。")
+    reports = [evaluate(field, index, data["cases"]) for field in fields]
+    meta = {"mode": "retrieval", "retriever": "sqlite-fts5-bigram + 适用性过滤", "cases": len(data["cases"]),
+            "rewritten_by": data.get("rewritten_by"), "business_date": str(business_today())}
+    write_results(directory, reports, meta)
+    for report in reports:
+        print(json.dumps({"query": report["query_field"], **report["summary"]}, ensure_ascii=False), flush=True)
+    try:
+        settings = load_settings()
+    except Exception:
+        settings = None
+    if settings and settings.phoenix_enabled:
+        print("Phoenix 实验：", log_phoenix_experiment(settings, reports, data["cases"], index))
+    print("机器结果：", directory)
+    return 0
 
 
 if __name__ == "__main__":

@@ -132,6 +132,21 @@ uv run python -X utf8 evals/replay.py --mode live --select holdout
 
 `--select` 支持场景 ID、组名以及逗号分隔选择；`core` 为除独立检查组外的十一个场景（退货退款、补问、超期、审批、转人工、故障、换货、物流），`all` 包含全部十三个场景。例如 `--select exchange,logistics` 只运行换货与物流的四个场景。离线通过不能作为真实模型理解能力的结论；检查结果中的 `passed`、最终状态与失败步骤，而不是比较回复文字是否逐字相同。
 
+**检索评测**（同一入口，不调用模型、不需要密钥）：用 `evals/retrieval_cases.json` 中的 80 道虚构问题评测政策检索，结果写入 `artifacts/retrieval-…/results.json` 与 `results.csv`。
+
+```powershell
+# 用户原话与模型改写问法两种输入各跑一遍
+uv run python -X utf8 evals/replay.py --mode retrieval --query both
+
+# 只跑用户原话
+uv run python -X utf8 evals/replay.py --mode retrieval --query original
+
+# 用真实识别模型重新生成改写问法并写回评测集（约 80 次模型调用，会产生 API 消耗）
+uv run python -X utf8 evals/replay.py --mode retrieval --refresh-rewrites
+```
+
+输出 Recall@3、Recall@5、MRR（只统计有依据的问题）、无依据判定准确率、有依据问题被误判为无依据的比例和检索耗时，并按诉求、退货原因、商品品类、检索难点分组。每道题都标注了期望条款（需要核对版本时写为“编号@版本”）和考察的检索难点。`.env` 开启 Phoenix 且本地 Phoenix 运行时，评测集与结果同时记录为 Phoenix 的数据集和实验。
+
 运行全部业务测试（pytest 统一入口，不调用模型、不发起网络请求，约 1 分钟；`tests/` 只在本地开发环境中保留，不随仓库发布）：
 
 ```powershell
