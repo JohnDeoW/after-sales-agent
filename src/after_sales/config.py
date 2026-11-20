@@ -24,7 +24,7 @@ class ConfigurationError(ValueError):
 @dataclass(frozen=True)
 class Settings:
     llm_api_key: str = field(repr=False)
-    llm_base_url: str = "https://rightapi.ai/v1"
+    llm_base_url: str = ""
     llm_model_id: str = "gpt-6.2-sol"
     llm_timeout_seconds: int = 120
     confirmation_ttl_seconds: int = 86400
@@ -47,6 +47,10 @@ def load_settings() -> Settings:
             f"请在 {ENV_FILE} 中填写 LLM_API_KEY；当前项目尚未配置 API 密钥。"
         )
 
+    base_url = (values.get("LLM_BASE_URL") or "").strip()
+    if not base_url:
+        raise ConfigurationError(f"请在 {ENV_FILE} 中填写 LLM_BASE_URL（模型服务接口地址）。")
+
     def duration(name: str, default: int) -> int:
         try:
             value = int(values.get(name) or default)
@@ -64,7 +68,7 @@ def load_settings() -> Settings:
 
     return Settings(
         llm_api_key=api_key,
-        llm_base_url=(values.get("LLM_BASE_URL") or "https://rightapi.ai/v1").strip(),
+        llm_base_url=base_url,
         llm_model_id=(values.get("LLM_MODEL_ID") or "gpt-6.2-sol").strip(),
         llm_timeout_seconds=duration("LLM_TIMEOUT_SECONDS", 120),
         confirmation_ttl_seconds=duration("CONFIRMATION_TTL_SECONDS", 86400),
