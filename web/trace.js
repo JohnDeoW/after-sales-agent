@@ -11,7 +11,7 @@ const labels = {
   persist_turn: "保存本轮结果", confirm: "核对方案确认", cancel: "取消办理",
   create_request: "创建申请", policy_consultation: "检索适用政策", exchange: "检查换货条件",
   confirm_exchange: "确认换货", service_handoff: "交接人工", reply: "返回已保存结果",
-  wait: "检查是否需要等待", await_confirmation: "等待方案确认", await_approval: "等待客服审批", finish: "本轮结束",
+  query_agent: "Agent 选择查询工具", QueryAgent: "模型选择只读工具", wait: "检查是否需要等待", await_confirmation: "等待方案确认", await_approval: "等待客服审批", finish: "本轮结束",
   // 业务工具
   get_order: "查询订单", list_orders: "列出本人订单", search_policy: "检索政策条款", get_logistics: "查询物流",
   get_inventory: "查询库存", get_case: "查询案件", list_cases: "列出案件", get_ticket: "查询工单", list_tickets: "列出工单",
@@ -103,6 +103,13 @@ function eventNode(event, maxDuration, shownCitations) {
       ["尝试次数", failure.attempt],
     ]));
   }
+  if (result.selected_tools) {
+    // Agent 子图中模型自主选择的只读工具及参数。
+    box.append(el("h4", "模型选择的工具"), factList(result.selected_tools.length
+      ? result.selected_tools.map(call => [label(call.name), Object.entries(call.args || {}).map(([k, v]) => `${argNames[k] || k} ${v}`).join("，") || "无参数"])
+      : [["结果", "未选择工具"]]));
+  }
+  if (event.attempts > 1) box.append(el("p", `临时失败后重试，共尝试 ${event.attempts} 次。`, "muted trace-note"));
   const metrics = event.model_metrics;
   if (metrics) {
     box.append(el("h4", "模型响应"), factList([

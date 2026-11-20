@@ -30,7 +30,7 @@
 | 模型 | 中转站 GPT 系列（默认 `gpt-6.2-sol`），Responses 接口，配置来自本目录 `.env`；连接失败与上游 5xx 用 `.with_retry()` 重试一次 | 不变 |
 | 业务存储 | SQLite | 不变 |
 | 政策检索 | SQLite FTS5（中文双字切分）+ 适用性过滤 + 版本冲突检测 | `Document` + 文本切分器、`FastEmbedEmbeddings`（bge-small-zh）+ `Chroma`、jieba `BM25Retriever`、`EnsembleRetriever`、`ParentDocumentRetriever`、索引 API、可选重排序 |
-| 工具调用 | 12 个只读查询均为 LangChain `@tool`（白名单 `tools/registry.py`），会话身份经运行配置注入；代码按意图选择工具 | `create_agent` 子图 + 调用上限中间件自主选择只读工具；只读工具同时以 MCP 服务提供 |
+| 工具调用 | 12 个只读查询均为 LangChain `@tool`（白名单 `tools/registry.py`），会话身份经运行配置注入；自然语言查询由 `create_agent` 子图在白名单内自主选择工具，`ModelCallLimitMiddleware` / `ToolCallLimitMiddleware` 限制调用次数 | 只读工具同时以 MCP 服务提供，Agent 经 MCP 调用 |
 | 可观测 | `BaseCallbackHandler` 生成页面轨迹；可选本地 Arize Phoenix（`phoenix.otel.register` + `LangChainInstrumentor` 自动埋点，`.env` 开关，默认关闭） | 不变 |
 | 页面 | FastAPI 提供静态 HTML/CSS/原生 JS 模块，无构建工程；SSE 流式事件 | 完善界面与排版设计，作为展示全部能力的主入口（见第 14 节） |
 | 验证 | pytest 业务测试（本地）；`evals/replay.py` 离线/真实模型场景回放（13 个场景） | 检索评测与 RAG 方案对比 |
@@ -63,7 +63,7 @@ flowchart LR
 1. 从服务端会话取得身份；从检查点读取会话图状态，若会话所在案件已被其他会话或业务操作更新（案件进度 revision 变化）则改用案件进度中的最新草稿。
 2. 页面按钮和明确指令（如“选择商品 ITEM-003”“确认换货”、带编号的确认/提交命令）直接路由，不调用模型。
 3. 其余消息由模型做一次结构化提取（`IntakeUpdate`）：意图、订单、商品、数量、原因、拆封情况等，只提取本轮新增或更正的信息。
-4. 代码按意图选择只读工具（订单、物流、库存、案件、申请、工单、政策检索），按归属校验返回数据。
+4. 自然语言的查询（订单、物流、申请、案件、工单）进入 `query_agent` 节点：`create_agent` 子图把识别出的编号与会话已知编号交给模型，由模型在只读工具白名单内选择工具，可并行调用多个；工具设为 `return_direct`，执行后即结束，答复由确定性代码按查询结果生成。页面按钮的固定指令与退货办理所需的订单查询仍走确定性路径。工具按会话身份校验归属。
 5. 缺信息时只补问必要字段，并在回复卡片中给出可点击的候选；补问次数有上限，超过后转人工。
 6. 规则服务根据订单事实和结构化政策计算资格、金额与审批要求，附上规则说明和所用条款；不再调用模型改写同一结论。
 7. 政策咨询走检索 → 适用性过滤 → 冲突检测 → 模型依据条款回答，引用必须来自本轮检索结果。
@@ -84,6 +84,7 @@ flowchart LR
 | 卡片与历史 | 卡片是当时快照，读取时附当前状态；失效卡片不提供按钮，后端仍拒绝旧版本 | 历史可追溯，同时不误导操作 |
 | 模型故障 | 分为超时、连接失败、限流、上游错误、输出格式；超时 504、限流 429、其余 502；连接失败和上游 5xx 用 `.with_retry()` 重试一次 | 能从轨迹判断故障来源；超时重试会让等待翻倍 |
 | 会话状态与业务事务 | 会话图状态由检查点保存；案件草稿同时写入案件进度表，与确认、提交、换货等业务写入同一事务；读取时以案件进度 revision 判断检查点是否过期 | 保留事务内的版本与冲突校验；检查点在业务提交后单独写入，崩溃时有案件的会话从案件进度恢复，无案件会话最多丢失最后一轮补充信息 |
+| 查询由 Agent 选择工具 | 只读工具设为 `return_direct`，子图只调用一次模型（`ModelCallLimitMiddleware` 上限 1），工具最多 3 个；结果作为 artifact 交回工作流，按映射表生成答复，不采用模型自由文本；伪造参数被工具 schema 拒绝，超出上限时停止并说明；离线回放与测试用按同一规则选择的替身模型 | 展示 Agent 自主工具选择，同时把额外耗时控制在一次模型调用；同一回放场景单次实测，查询轮增加一次约 2 秒的模型调用与约 900 token，通过率不变 |
 | interrupt 与授权 | `interrupt` 只负责持久化等待点和恢复；确认、审批的有效性仍由业务服务在写入事务中校验；等待点丢失时下一轮结束会重新建立 | 等待点不是授权来源，不会因检查点异常而放行或卡死 |
 | 耗时 | 方案轮只调用一次模型；政策咨询两次 | 规则说明由代码给出；同一回放场景单次实测，方案轮从 28.2 秒降到 8.2 秒，token 减少约一半 |
 | 多角色演示 | 按角色分别保存会话，请求头只选择已有会话，权限仍按会话用户校验 | 同一浏览器可并行演示三方，且不放宽权限 |
@@ -102,7 +103,7 @@ flowchart LR
 | 手写的连接失败重试循环 | `.with_retry(retry_if_exception_type=...)` | 2 | 当前 |
 | 无外部追踪 | Phoenix + `LangChainInstrumentor` 自动埋点 | 3 | 当前 |
 | 部分只读查询直接调用服务 | 全部改为 `@tool`，身份经运行配置注入 | 4 | 当前 |
-| 按意图固定选择工具 | `create_agent` 子图 + `ToolCallLimitMiddleware` / `ModelCallLimitMiddleware` | 4 | 目标 |
+| 按意图固定选择工具 | `create_agent` 子图 + `ToolCallLimitMiddleware` / `ModelCallLimitMiddleware` | 4 | 当前 |
 | 无 | MCP Python SDK 服务 + `langchain-mcp-adapters` | 5 | 目标 |
 | 自建 FTS5 索引与双字切分 | `Document`、`MarkdownHeaderTextSplitter`、`RecursiveCharacterTextSplitter`、jieba `BM25Retriever` | 8 | 目标 |
 | 无向量检索 | `FastEmbedEmbeddings` + `Chroma` | 8 | 目标 |
@@ -120,11 +121,11 @@ flowchart LR
 - **Phoenix：** 可选依赖组 `observability`。本地运行 Arize Phoenix，通过 `phoenix.otel.register`（OpenTelemetry 导出）与 `LangChainInstrumentor`（OpenInference 自动埋点）记录完整调用链；由 `.env` 开关控制，默认关闭；可配置隐藏模型输入输出。Phoenix 面向开发调试与评测，页面轨迹面向用户，两者并存。发送协议为标准 OTLP，以后可改接其他兼容平台。开启后页面轨迹面板提供 Phoenix 入口；服务关闭时推送剩余 span。
 - **密钥与隐私：** 模型的 API 密钥以 `SecretStr` 保存，不进入 span；`PHOENIX_HIDE_IO=true` 时隐藏消息、输入输出、工具定义与检索文档原文。
 
-## 8. Agent 工具调用与 MCP（目标，阶段 4—5）
+## 8. Agent 工具调用（当前）与 MCP（目标，阶段 5）
 
 - （当前）订单、物流、库存、政策检索、案件、退货申请、换货申请、工单等只读查询全部为 LangChain 工具；工具函数声明 `config: RunnableConfig`，由 LangChain 注入会话身份，不出现在参数 schema 中，缺少会话时拒绝查询。
-- 主图中的只读查询环节由 `create_agent` 构建的子图承担：模型在工具白名单内自行决定调用哪些、调用几次，调用次数由中间件限制。
-- 退款、创建申请、确认、审批、工单写入仍是确定性节点，模型无法调用。
+- （当前）主图中的自然语言查询由 `create_agent` 构建的子图承担：模型在工具白名单内自行决定调用哪些工具，调用次数由中间件限制；轨迹记录模型选择的工具与参数。
+- （当前）退款、创建申请、确认、审批、工单写入仍是确定性节点，不在 Agent 的工具列表中，模型无法调用。
 - 只读工具以 MCP 服务（stdio 与 HTTP）提供，复用相同的业务查询与身份校验；Agent 用 `MultiServerMCPClient` 加载 MCP 工具，直接调用与经 MCP 调用结果一致。
 
 ## 9. 政策检索与 RAG（目标，阶段 6—9）
@@ -208,7 +209,7 @@ flowchart LR
 after-sales-agent/
 ├── src/after_sales/
 │   ├── api/          # 客户、客服、仓库、换货与页面接口
-│   ├── agent/        # 模型连接、诉求提取、政策解释、上下文组装
+│   ├── agent/        # 模型连接与重试、诉求提取、政策解释、只读查询 Agent、上下文组装
 │   ├── workflow/     # LangGraph 工作流
 │   │   ├── graph.py      # 建图、检查点、流式运行、等待点恢复与失败处理
 │   │   ├── nodes/        # 按职责划分的节点：路由与识别、只读查询、退货、换货/人工/政策、写操作、等待

@@ -18,6 +18,7 @@ from langgraph.errors import GraphRecursionError
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Command
 
+from after_sales.agent.query_agent import QueryAgent, RuleToolSelector
 from after_sales.domain.cases import CaseService
 from after_sales.domain.exchanges import ExchangeService
 from after_sales.domain.intake_service import ReturnIntake, _result
@@ -46,7 +47,7 @@ def build_graph(checkpointer=None):
     nodes = {
         "load_context": routing.load, "route_command": routing.route_command,
         "prepare_context": routing.prepare_context, "recognize": routing.recognize,
-        "select_read_tool": reads.select_read_tool, "read_tool": reads.read_tool,
+        "select_read_tool": reads.select_read_tool, "read_tool": reads.read_tool, "query_agent": reads.query_agent,
         "collect_information": returns.collect_information, "evaluate_rules": returns.evaluate_rules,
         "proposal": returns.persist_turn, "clarify": returns.clarify, "persist_turn": returns.persist_turn,
         "confirm": actions.confirm, "cancel": actions.cancel, "create_request": actions.create_request,
@@ -64,7 +65,7 @@ def build_graph(checkpointer=None):
     builder.add_conditional_edges("route_command", route, routing.COMMAND_NODES)
     builder.add_edge("prepare_context", "recognize")
     builder.add_conditional_edges("recognize", route, routing.RECOGNIZED_NODES)
-    for name in ("service_handoff", "exchange", "policy_consultation", "clarify"):
+    for name in ("service_handoff", "exchange", "policy_consultation", "clarify", "query_agent"):
         builder.add_edge(name, "persist_turn")
     builder.add_edge("select_read_tool", "read_tool")
     builder.add_conditional_edges("read_tool", route, ["collect_information", "persist_turn"])
@@ -80,7 +81,7 @@ def build_graph(checkpointer=None):
 
 class AfterSalesWorkflow:
     def __init__(self, customers, extractor, limits: Limits | None = None, *, policy_explainer=None,
-                 policy_index_path=INDEX_PATH):
+                 policy_index_path=INDEX_PATH, tool_selector=None):
         self.customers = customers
         self.extractor = extractor
         self.limits = limits or Limits()
@@ -92,6 +93,8 @@ class AfterSalesWorkflow:
         self.intake = ReturnIntake()
         self.policy_explainer = policy_explainer
         self.policy_tool = create_search_policy_tool(policy_index_path)
+        # 只读查询 Agent：真实模型或离线替身选择模型（RuleToolSelector）。
+        self.query_agent = QueryAgent(tool_selector or RuleToolSelector())
         # 检查点与业务数据在同一个本地库文件中，按会话保存图状态。
         connection = sqlite3.connect(customers.db_path, check_same_thread=False, timeout=5)
         self.checkpointer = SqliteSaver(connection, serde=SERDE)

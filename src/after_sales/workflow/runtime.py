@@ -91,7 +91,7 @@ def summary(value) -> dict:
         result["citations"] = [{k: p[k] for k in ("chunk_id", "clause_id", "version", "title", "body") if k in p} for p in evidence]
     if value.get("ticket"):
         result["ticket"] = {k: value["ticket"][k] for k in ("id", "status", "category") if k in value["ticket"]}
-    for key in ("interrupt", "resumed", "pending"):
+    for key in ("interrupt", "resumed", "pending", "selected_tools"):
         if value.get(key):
             result[key] = value[key]
     return result

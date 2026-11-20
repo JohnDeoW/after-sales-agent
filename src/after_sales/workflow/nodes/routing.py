@@ -11,10 +11,10 @@ from after_sales.domain.intake_service import match_order_item
 from after_sales.domain.proposals import ProposalNotFound
 from after_sales.storage.intake import load_context
 from after_sales.workflow.nodes.common import get_order, model_step
+from after_sales.workflow.nodes.reads import QUERY_INTENTS
 from after_sales.workflow.state import State, TurnContext
 
 END_PUNCT = "。！!"
-READ_INTENTS = ("return", "order_query", "return_query", "exchange_query", "case_query", "ticket_query", "logistics")
 SERVICE_INTENTS = ("repair", "quality_dispute", "human")
 
 
@@ -122,7 +122,7 @@ CONFIRM_RETURN = (r"(?:^|[，,。；;！!])\s*(?:我)?(?:确认(?:办理|退货|
 CONFIRM_EXCHANGE = (r"(?:^|[，,。；;！!])\s*(?:我)?(?:确认(?:换货|办理|(?:按)?(?:当前|这个|现在的)方案(?:换货|办理)?)?"
                     r"|同意(?:按)?(?:当前|这个|现在的)方案(?:换货|办理)?|就按(?:当前|这个|现在的)方案(?:换货|办理)(?:吧)?)\s*[。！!]*$")
 CANCEL_RETURN = r"(?:^|[，,。；;！!])\s*(?:我)?(?:不退了|不退货了|取消(?:本次|这次)?(?:退货(?:申请)?|办理))\s*[。！!]*$"
-RECOGNIZED_NODES = ["select_read_tool", "clarify", "policy_consultation", "exchange", "service_handoff",
+RECOGNIZED_NODES = ["select_read_tool", "query_agent", "clarify", "policy_consultation", "exchange", "service_handoff",
                     "confirm", "cancel", "confirm_exchange"]
 
 
@@ -185,6 +185,9 @@ def recognize(s: State, runtime: Runtime[TurnContext]) -> dict:
         next_node = "service_handoff"
     elif update.intent in ("exchange", "policy"):
         next_node = {"exchange": "exchange", "policy": "policy_consultation"}[update.intent]
+    elif update.intent in QUERY_INTENTS:
+        # 自然语言查询由 Agent 子图在只读工具白名单内选择工具。
+        next_node = "query_agent"
     else:
-        next_node = "select_read_tool" if update.intent in READ_INTENTS else "clarify"
+        next_node = "select_read_tool" if update.intent == "return" else "clarify"
     return {"update": update, "context": context, "next": next_node}

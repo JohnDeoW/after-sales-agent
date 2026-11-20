@@ -133,10 +133,16 @@ class TraceHandler(BaseCallbackHandler):
     def on_chain_error(self, error, *, run_id, **kwargs):
         self._finish(run_id, error=error)
 
-    def on_tool_start(self, serialized, input_str, *, run_id, parent_run_id=None, inputs=None, **kwargs):
+    def on_tool_start(self, serialized, input_str, *, run_id, parent_run_id=None, inputs=None, tags=None, **kwargs):
         self._parents[run_id] = parent_run_id
-        if self._owner(parent_run_id, "tool") is None:
+        owner = self._owner(parent_run_id, "tool")
+        if owner is None:
             self._start(run_id, "tool", (serialized or {}).get("name") or kwargs.get("name"), inputs)
+        else:
+            # Agent 工具内部的白名单工具重试：记在外层工具事件上。
+            attempt = next((int(t.rsplit(":", 1)[1]) for t in tags or [] if t.startswith("retry:attempt:")), None)
+            if attempt:
+                owner["attempts"] = attempt
 
     def on_tool_end(self, output, *, run_id, **kwargs):
         self._finish(run_id, output=output)
@@ -144,8 +150,12 @@ class TraceHandler(BaseCallbackHandler):
     def on_tool_error(self, error, *, run_id, **kwargs):
         self._finish(run_id, error=error)
 
-    def on_chat_model_start(self, serialized, messages, *, run_id, parent_run_id=None, **kwargs):
+    def on_chat_model_start(self, serialized, messages, *, run_id, parent_run_id=None, metadata=None, **kwargs):
         self._parents[run_id] = parent_run_id
+        # Agent 子图内部的模型调用（不在 model_step 中）单独记为模型事件，结果记录模型选择的工具。
+        agent = (metadata or {}).get("lc_agent_name")
+        if agent and self._owner(parent_run_id, "model") is None:
+            self._start(run_id, "model", agent)
 
     def on_llm_new_token(self, token, *, run_id, **kwargs):
         owner = self._owner(run_id, "model")
@@ -159,10 +169,18 @@ class TraceHandler(BaseCallbackHandler):
 
     def on_llm_end(self, response, *, run_id, **kwargs):
         generation = response.generations[0][0] if response.generations and response.generations[0] else None
-        usage = getattr(getattr(generation, "message", None), "usage_metadata", None)
+        message = getattr(generation, "message", None)
+        usage = getattr(message, "usage_metadata", None)
         if usage:
             for key in ("input_tokens", "output_tokens", "total_tokens"):
                 self.tokens[key] = self.tokens.get(key, 0) + usage.get(key, 0)
+        if run_id in self._open:
+            self._finish(run_id, output={"selected_tools": [
+                {"name": call["name"], "args": {k: v for k, v in call["args"].items() if k in TRACE_ARGS}}
+                for call in getattr(message, "tool_calls", None) or []]})
+
+    def on_llm_error(self, error, *, run_id, **kwargs):
+        self._finish(run_id, error=error)
 
     # ---- 结果 ----
     def usage(self) -> dict:
