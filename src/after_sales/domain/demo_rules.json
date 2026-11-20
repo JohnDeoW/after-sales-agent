@@ -13,15 +13,104 @@
   "product_scopes": {
     "demo_goods": {
       "title": "演示目录中的普通实物商品",
-      "skus": ["MOUSE-BLACK", "KEYBOARD-WHITE", "CABLE-1M", "STAND-SILVER", "HEADPHONE-BLACK", "PAD-GREY"]
+      "skus": [
+        "MOUSE-BLACK",
+        "KEYBOARD-WHITE",
+        "CABLE-1M",
+        "STAND-SILVER",
+        "HEADPHONE-BLACK",
+        "PAD-GREY"
+      ]
     },
     "demo_accessories": {
       "title": "鼠标、键盘、数据线、支架及鼠标垫",
-      "skus": ["MOUSE-BLACK", "KEYBOARD-WHITE", "CABLE-1M", "STAND-SILVER", "PAD-GREY"]
+      "skus": [
+        "MOUSE-BLACK",
+        "KEYBOARD-WHITE",
+        "CABLE-1M",
+        "STAND-SILVER",
+        "PAD-GREY"
+      ]
     },
     "demo_audio": {
       "title": "演示耳机",
-      "skus": ["HEADPHONE-BLACK"]
+      "skus": [
+        "HEADPHONE-BLACK"
+      ]
+    },
+    "all_goods": {
+      "title": "全部演示商品（通用条款，不限商品）",
+      "all_products": true,
+      "skus": []
+    },
+    "apparel": {
+      "title": "服装鞋包",
+      "skus": [
+        "TSHIRT-COTTON-M",
+        "JACKET-DOWN-L",
+        "SHOES-RUN-42"
+      ]
+    },
+    "appliances": {
+      "title": "小家电",
+      "skus": [
+        "AIRFRYER-4L",
+        "KETTLE-1L",
+        "VACUUM-ROBOT"
+      ]
+    },
+    "beauty": {
+      "title": "个护美妆",
+      "skus": [
+        "SERUM-30ML",
+        "LIPSTICK-RED"
+      ]
+    },
+    "food": {
+      "title": "食品",
+      "skus": [
+        "TEA-GIFT-BOX",
+        "NUTS-MIX-500G"
+      ]
+    },
+    "digital_goods": {
+      "title": "数码配件",
+      "skus": [
+        "MOUSE-BLACK",
+        "KEYBOARD-WHITE",
+        "CABLE-1M",
+        "HEADPHONE-BLACK",
+        "POWERBANK-10K",
+        "EARBUDS-PRO"
+      ]
+    },
+    "bundles": {
+      "title": "套装商品",
+      "skus": [
+        "GIFT-SET-DESK"
+      ]
+    },
+    "presale": {
+      "title": "预售商品",
+      "skus": [
+        "KEYBOARD-PRESALE"
+      ]
+    },
+    "custom": {
+      "title": "定制商品",
+      "skus": [
+        "MUG-CUSTOM-PHOTO"
+      ]
+    },
+    "non_returnable": {
+      "title": "特殊不退商品",
+      "skus": [
+        "UNDERWEAR-SET",
+        "GIFTCARD-100",
+        "MUG-CUSTOM-PHOTO",
+        "TEA-GIFT-BOX",
+        "NUTS-MIX-500G"
+      ]
     }
   },
   "clauses": [
@@ -29,73 +118,868 @@
       "clause_id": "DEMO-RETURN-WINDOW",
       "version": "demo-v0",
       "title": "普通退货期限（历史版本）",
-      "applies_to": {"product_scope": "demo_goods", "effective_from": null, "effective_until": "2026-10-01", "reason_kind": "other"},
-      "rules": {"required_order_status": "delivered", "date_field": "signed_on", "min_days": 0, "max_days": 5, "max_days_inclusive": true, "requires_unopened": true},
+      "category": "return",
+      "applies_to": {
+        "product_scope": "demo_goods",
+        "effective_from": null,
+        "effective_until": "2026-10-01",
+        "reason_kind": "other"
+      },
+      "rules": {
+        "required_order_status": "delivered",
+        "date_field": "signed_on",
+        "min_days": 0,
+        "max_days": 5,
+        "max_days_inclusive": true,
+        "requires_unopened": true
+      },
       "body": "【虚构演示政策】仅适用于2026年10月1日之前下单的演示目录商品。普通退货要求订单已签收，自签收日起不超过5个自然日且商品未拆封；签收当日为第0日，第5日有效，第6日不适用。质量问题按DEMO-QUALITY另行判断。"
     },
     {
       "clause_id": "DEMO-RETURN-WINDOW",
       "version": "demo-v1",
       "title": "普通退货期限",
-      "applies_to": {"product_scope": "demo_goods", "effective_from": "2026-10-01", "effective_until": null, "reason_kind": "other"},
-      "rules": {"required_order_status": "delivered", "date_field": "signed_on", "min_days": 0, "max_days": 7, "max_days_inclusive": true, "requires_unopened": true},
+      "category": "return",
+      "applies_to": {
+        "product_scope": "demo_goods",
+        "effective_from": "2026-10-01",
+        "effective_until": null,
+        "reason_kind": "other"
+      },
+      "rules": {
+        "required_order_status": "delivered",
+        "date_field": "signed_on",
+        "min_days": 0,
+        "max_days": 7,
+        "max_days_inclusive": true,
+        "requires_unopened": true
+      },
       "body": "【虚构演示政策】适用于2026年10月1日及以后下单的演示目录商品。普通退货要求订单已签收，自签收日起不超过7个自然日且商品未拆封；签收当日为第0日，第7日有效，第8日不适用。质量问题按DEMO-QUALITY另行判断。"
     },
     {
       "clause_id": "DEMO-OPENED-ACCESSORIES",
       "version": "demo-v1",
       "title": "普通配件拆封限制",
-      "applies_to": {"product_scope": "demo_accessories", "effective_from": null, "effective_until": null, "reason_kind": "other"},
-      "rules": {"required_opened": false, "unknown_opened_action": "clarify", "opened_action": "ineligible"},
+      "category": "opened_trial",
+      "applies_to": {
+        "product_scope": "demo_accessories",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "other"
+      },
+      "rules": {
+        "required_opened": false,
+        "unknown_opened_action": "clarify",
+        "opened_action": "ineligible"
+      },
       "body": "【虚构演示政策】鼠标、键盘、数据线、支架及鼠标垫的普通退货要求未拆封。拆封情况未知时应先询问，已拆封不满足普通退货条件；质量问题按DEMO-QUALITY处理。该条款不适用于耳机，耳机使用DEMO-OPENED-AUDIO。"
     },
     {
       "clause_id": "DEMO-OPENED-AUDIO",
       "version": "demo-v1",
       "title": "耳机拆封限制",
-      "applies_to": {"product_scope": "demo_audio", "effective_from": null, "effective_until": null, "reason_kind": "other"},
-      "rules": {"required_opened": false, "unknown_opened_action": "clarify", "opened_action": "ineligible"},
+      "category": "opened_trial",
+      "applies_to": {
+        "product_scope": "demo_audio",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "other"
+      },
+      "rules": {
+        "required_opened": false,
+        "unknown_opened_action": "clarify",
+        "opened_action": "ineligible"
+      },
       "body": "【虚构演示政策】本条仅适用于演示耳机。普通退货要求未拆封，拆封试听也属于已拆封；情况未知时应先询问。已拆封不能办理普通退货，但报告质量问题时仍按DEMO-QUALITY判断是否进入人工审核。"
     },
     {
       "clause_id": "DEMO-QUALITY",
       "version": "demo-v1",
       "title": "质量问题人工审核",
-      "applies_to": {"product_scope": "demo_goods", "effective_from": null, "effective_until": null, "reason_kind": "quality"},
-      "rules": {"required_order_status": "delivered", "date_field": "signed_on", "min_days": 0, "max_days": 30, "max_days_inclusive": true, "requires_unopened": false, "decision": "manual_review", "approval_reason": "quality_issue", "beyond_window_action": "ineligible"},
+      "category": "quality",
+      "applies_to": {
+        "product_scope": "demo_goods",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "quality"
+      },
+      "rules": {
+        "required_order_status": "delivered",
+        "date_field": "signed_on",
+        "min_days": 0,
+        "max_days": 30,
+        "max_days_inclusive": true,
+        "requires_unopened": false,
+        "decision": "manual_review",
+        "approval_reason": "quality_issue",
+        "beyond_window_action": "ineligible"
+      },
       "body": "【虚构演示政策】演示目录商品签收后30个自然日内报告质量问题进入人工审核，第30日有效，第31日超出本演示审核期限。质量问题不受普通退货期限和未拆封限制；进入审核不表示已经认定质量责任、批准退款或完成退款。"
     },
     {
       "clause_id": "DEMO-APPROVAL",
       "version": "demo-v1",
       "title": "退款方案审批门槛",
-      "applies_to": {"product_scope": "demo_goods", "effective_from": null, "effective_until": null, "reason_kind": "any"},
-      "rules": {"currency": "CNY", "amount_unit": "cent", "threshold_cents": 50000, "comparison": "gt", "quality_requires_approval": true, "requires_user_confirmation": true, "approval_bound_to_proposal_version": true},
+      "category": "refund",
+      "applies_to": {
+        "product_scope": "demo_goods",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "any"
+      },
+      "rules": {
+        "currency": "CNY",
+        "amount_unit": "cent",
+        "threshold_cents": 50000,
+        "comparison": "gt",
+        "quality_requires_approval": true,
+        "requires_user_confirmation": true,
+        "approval_bound_to_proposal_version": true
+      },
       "body": "【虚构演示政策】单次预计商品退款超过500元（50000分）时，除用户确认外还需客服批准；恰好500元不触发金额审批。质量例外无论金额大小均需人工审核。确认和审批绑定具体方案版本，方案变更后需要重新确认及必要审批。"
     },
     {
       "clause_id": "DEMO-REFUND-CONDITIONS",
       "version": "demo-v1",
       "title": "退款执行条件",
-      "applies_to": {"product_scope": "demo_goods", "effective_from": null, "effective_until": null, "reason_kind": "any"},
-      "rules": {"requires_valid_application": true, "requires_current_confirmation": true, "requires_approval_when_applicable": true, "requires_warehouse_received": true, "requires_inspection_passed": true, "application_is_refund_success": false},
+      "category": "refund",
+      "applies_to": {
+        "product_scope": "demo_goods",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "any"
+      },
+      "rules": {
+        "requires_valid_application": true,
+        "requires_current_confirmation": true,
+        "requires_approval_when_applicable": true,
+        "requires_warehouse_received": true,
+        "requires_inspection_passed": true,
+        "application_is_refund_success": false
+      },
       "body": "【虚构演示政策】退款执行须同时满足：有效售后申请、当前方案已由用户确认、必要审批有效、仓库已签收退回商品且检验通过。确认并取得受理及退回指引后再寄回；仅创建申请、提交退货单号或物流显示签收都不表示已退款，检验未通过需转人工处理。"
     },
     {
       "clause_id": "DEMO-REFUND-AMOUNT",
       "version": "demo-v1",
       "title": "商品退款金额与部分退货",
-      "applies_to": {"product_scope": "demo_goods", "effective_from": null, "effective_until": null, "reason_kind": "any"},
-      "rules": {"currency": "CNY", "amount_unit": "cent", "amount_field": "paid_amount_cents", "discount_allocation": "fixed_at_order_initialization", "unit_allocation": "integer_division", "remainder_allocation": "last_returnable_unit", "deduct_refunded_amount": true, "max_total": "item_paid_amount", "max_quantity": "purchased_minus_returned"},
+      "category": "refund",
+      "applies_to": {
+        "product_scope": "demo_goods",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "any"
+      },
+      "rules": {
+        "currency": "CNY",
+        "amount_unit": "cent",
+        "amount_field": "paid_amount_cents",
+        "discount_allocation": "fixed_at_order_initialization",
+        "unit_allocation": "integer_division",
+        "remainder_allocation": "last_returnable_unit",
+        "deduct_refunded_amount": true,
+        "max_total": "item_paid_amount",
+        "max_quantity": "purchased_minus_returned"
+      },
       "body": "【虚构演示政策】退款限退货商品项已分摊优惠后的实付金额，以整数分计算。实付按购买数量整除分配，最后一个可退单位吸收分币余数。数量不得超过购买数量减已退数量，累计退款不得超过该项实付，须扣除已退款额度；模型不得自行决定金额。"
     },
     {
       "clause_id": "DEMO-SHIPPING",
       "version": "demo-v1",
       "title": "运费和运费争议",
-      "applies_to": {"product_scope": "demo_goods", "effective_from": null, "effective_until": null, "reason_kind": "any"},
-      "rules": {"include_original_shipping_in_refund": false, "auto_reimburse_return_shipping": false, "shipping_dispute_action": "manual_review", "model_may_estimate_shipping": false},
+      "category": "shipping",
+      "applies_to": {
+        "product_scope": "demo_goods",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "any"
+      },
+      "rules": {
+        "include_original_shipping_in_refund": false,
+        "auto_reimburse_return_shipping": false,
+        "shipping_dispute_action": "manual_review",
+        "model_may_estimate_shipping": false
+      },
       "body": "【虚构演示政策】首版自动预估和退款只包括商品实付，不包含原订单运费，也不自动计算或报销寄回运费。运费承担、补偿或争议交由人工判断；不能据此断言运费一定由买家承担，也不能由模型临时估算后加入退款。"
+    },
+    {
+      "clause_id": "DEMO-RETURN-WINDOW-APPAREL",
+      "version": "demo-v0",
+      "title": "服装鞋包退货期限（历史版本）",
+      "category": "return",
+      "applies_to": {
+        "product_scope": "apparel",
+        "effective_from": null,
+        "effective_until": "2026-10-01",
+        "reason_kind": "other"
+      },
+      "body": "【虚构演示政策】仅适用于2026年10月1日之前下单的服装鞋包。普通退货须在签收后7个自然日内申请，吊牌完好、未洗涤、未穿着外出；签收当日为第0日。质量问题按质量问题条款处理。"
+    },
+    {
+      "clause_id": "DEMO-RETURN-WINDOW-APPAREL",
+      "version": "demo-v1",
+      "title": "服装鞋包退货期限",
+      "category": "return",
+      "applies_to": {
+        "product_scope": "apparel",
+        "effective_from": "2026-10-01",
+        "effective_until": null,
+        "reason_kind": "other"
+      },
+      "body": "【虚构演示政策】适用于2026年10月1日及以后下单的服装鞋包。普通退货须在签收后15个自然日内申请，吊牌完好、未洗涤、未穿着外出；签收当日为第0日。允许室内试穿，试穿规则见DEMO-TRIAL-APPAREL。"
+    },
+    {
+      "clause_id": "DEMO-RETURN-WINDOW-APPLIANCE",
+      "version": "demo-v1",
+      "title": "小家电退货期限",
+      "category": "return",
+      "applies_to": {
+        "product_scope": "appliances",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "other"
+      },
+      "body": "【虚构演示政策】空气炸锅、电水壶、扫地机器人等小家电，普通退货须在签收后7个自然日内申请，且未安装、未通电使用，外包装和全部配件齐全。已通电使用的家电不能按普通退货办理，故障按开箱故障或保修条款处理。"
+    },
+    {
+      "clause_id": "DEMO-RETURN-COMPLETE",
+      "version": "demo-v1",
+      "title": "退回商品完整性要求",
+      "category": "return",
+      "applies_to": {
+        "product_scope": "all_goods",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "any"
+      },
+      "body": "【虚构演示政策】退回商品须保持出售时的完整状态：主商品、配件、说明书、保修卡及赠品齐全，不得人为损坏。缺少配件或赠品时，经仓库检验后可能扣减相应金额或转人工处理，赠品规则见DEMO-GIFT-RETURN。"
+    },
+    {
+      "clause_id": "DEMO-RETURN-INSPECTION",
+      "version": "demo-v1",
+      "title": "退回商品检验标准",
+      "category": "return",
+      "applies_to": {
+        "product_scope": "all_goods",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "any"
+      },
+      "body": "【虚构演示政策】仓库收到退回商品后进行检验：核对商品与申请一致、配件赠品齐全，普通退货还须无人为损坏和使用痕迹。检验通过后才执行退款；检验未通过的停止自动处理并转人工，可将商品寄回给用户。"
+    },
+    {
+      "clause_id": "DEMO-AFTERSALE-DEADLINE",
+      "version": "demo-v1",
+      "title": "售后申请总期限",
+      "category": "return",
+      "applies_to": {
+        "product_scope": "all_goods",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "any"
+      },
+      "body": "【虚构演示政策】签收后90个自然日外不再受理退货、换货或价格保护申请，仍在保修期内的按保修条款维修。各类申请另有更短期限的，以对应条款为准。"
+    },
+    {
+      "clause_id": "DEMO-OPENED-APPLIANCE",
+      "version": "demo-v1",
+      "title": "小家电拆封限制",
+      "category": "opened_trial",
+      "applies_to": {
+        "product_scope": "appliances",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "other"
+      },
+      "body": "【虚构演示政策】小家电仅拆开外包装检查、未安装未通电的，不视为已使用，仍可在期限内普通退货；已安装、已通电或有使用痕迹的不能普通退货。拆开包装检查不等于试用。"
+    },
+    {
+      "clause_id": "DEMO-TRIAL-APPAREL",
+      "version": "demo-v1",
+      "title": "服装鞋包试穿规则",
+      "category": "opened_trial",
+      "applies_to": {
+        "product_scope": "apparel",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "other"
+      },
+      "body": "【虚构演示政策】服装鞋包允许在室内试穿以确认尺码，试穿不影响普通退货；已洗涤、已穿着外出、鞋底有磨损或吊牌已剪除的视为已使用，不能普通退货。"
+    },
+    {
+      "clause_id": "DEMO-TRIAL-BEAUTY",
+      "version": "demo-v1",
+      "title": "个护美妆拆封与试用",
+      "category": "opened_trial",
+      "applies_to": {
+        "product_scope": "beauty",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "other"
+      },
+      "body": "【虚构演示政策】个护美妆商品拆封或试用后不支持普通退货；未拆封（封膜、防伪贴完好）的可在签收后7个自然日内普通退货。使用后出现过敏等不适按DEMO-ALLERGY处理。"
+    },
+    {
+      "clause_id": "DEMO-QUALITY-DOA",
+      "version": "demo-v1",
+      "title": "开箱故障（签收7日内）",
+      "category": "quality",
+      "applies_to": {
+        "product_scope": "all_goods",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "quality"
+      },
+      "body": "【虚构演示政策】签收后7个自然日内出现非人为的性能故障（开箱即坏），可选择退货退款或同款换货，需提供故障照片或视频；超过7日的故障按保修条款维修。进入处理不表示已经认定责任或批准退款。"
+    },
+    {
+      "clause_id": "DEMO-DAMAGED-IN-TRANSIT",
+      "version": "demo-v1",
+      "title": "到货破损",
+      "category": "quality",
+      "applies_to": {
+        "product_scope": "all_goods",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "any"
+      },
+      "body": "【虚构演示政策】到货时外包装或商品破损，请在签收后48小时内提交破损照片（含外箱面单）申请；核实后可补发、换货或退款，相关运费由商家承担。超过48小时反馈的，按质量问题人工审核。"
+    },
+    {
+      "clause_id": "DEMO-MISSING-PARTS",
+      "version": "demo-v1",
+      "title": "少件漏发",
+      "category": "quality",
+      "applies_to": {
+        "product_scope": "all_goods",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "any"
+      },
+      "body": "【虚构演示政策】收到商品少件、漏发配件或赠品的，请在签收后7个自然日内反馈并提供开箱照片；核实后补发缺少的部分，不要求寄回已收到的商品。"
+    },
+    {
+      "clause_id": "DEMO-WRONG-ITEM",
+      "version": "demo-v1",
+      "title": "错发商品",
+      "category": "quality",
+      "applies_to": {
+        "product_scope": "all_goods",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "any"
+      },
+      "body": "【虚构演示政策】收到的商品与订单规格、颜色或型号不一致（错发）的，可在签收后15个自然日内申请重发正确商品或退货退款，往返运费由商家承担；错发商品请保持原状寄回。"
+    },
+    {
+      "clause_id": "DEMO-NOT-AS-DESCRIBED",
+      "version": "demo-v1",
+      "title": "与描述不符",
+      "category": "quality",
+      "applies_to": {
+        "product_scope": "all_goods",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "any"
+      },
+      "body": "【虚构演示政策】商品与页面描述明显不符（材质、尺寸、功能等）的，可在签收后15个自然日内申请，需提供实物照片和页面截图，人工审核认定后按退货退款处理；颜色等主观感受差异在合理范围内的，按普通退货处理。"
+    },
+    {
+      "clause_id": "DEMO-ALLERGY",
+      "version": "demo-v1",
+      "title": "过敏与使用不适",
+      "category": "quality",
+      "applies_to": {
+        "product_scope": "beauty",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "any"
+      },
+      "body": "【虚构演示政策】个护美妆商品使用后出现过敏、红肿等不适，可在签收后15个自然日内申请人工审核，需提供照片及就医或诊断记录；审核前不承诺退款，审核通过后退还该商品实付金额。"
+    },
+    {
+      "clause_id": "DEMO-QUALITY-EVIDENCE",
+      "version": "demo-v1",
+      "title": "质量问题材料要求",
+      "category": "quality",
+      "applies_to": {
+        "product_scope": "all_goods",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "quality"
+      },
+      "body": "【虚构演示政策】报告质量问题需提供能说明问题的材料：故障照片或视频、商品序列号或批次号、问题出现的时间与使用情况。材料只作为审核依据，系统不做图片识别或责任鉴定。"
+    },
+    {
+      "clause_id": "DEMO-EXCHANGE-SAME-SPEC",
+      "version": "demo-v0",
+      "title": "同款等价换货（历史版本）",
+      "category": "exchange",
+      "applies_to": {
+        "product_scope": "all_goods",
+        "effective_from": null,
+        "effective_until": "2026-10-01",
+        "reason_kind": "any"
+      },
+      "body": "【虚构演示政策】仅适用于2026年10月1日之前下单的商品。签收后7个自然日内可申请同款等价规格换货（如颜色、尺码），不支持换成其他商品或补差价；需目标规格有库存，确认后预留库存。"
+    },
+    {
+      "clause_id": "DEMO-EXCHANGE-SAME-SPEC",
+      "version": "demo-v1",
+      "title": "同款等价换货",
+      "category": "exchange",
+      "applies_to": {
+        "product_scope": "all_goods",
+        "effective_from": "2026-10-01",
+        "effective_until": null,
+        "reason_kind": "any"
+      },
+      "body": "【虚构演示政策】适用于2026年10月1日及以后下单的商品。签收后15个自然日内可申请同款等价规格换货（如颜色、尺码），不支持换成其他商品或补差价；需目标规格有库存，确认后预留库存。"
+    },
+    {
+      "clause_id": "DEMO-EXCHANGE-SIZE",
+      "version": "demo-v1",
+      "title": "服装鞋包换尺码",
+      "category": "exchange",
+      "applies_to": {
+        "product_scope": "apparel",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "other"
+      },
+      "body": "【虚构演示政策】服装鞋包因尺码不合适换码，每个商品项可免费换码一次，往返运费由商家承担；再次换码的寄回运费由买家承担。换码须吊牌完好、未洗涤。"
+    },
+    {
+      "clause_id": "DEMO-EXCHANGE-STOCK",
+      "version": "demo-v1",
+      "title": "换货缺货处理",
+      "category": "exchange",
+      "applies_to": {
+        "product_scope": "all_goods",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "any"
+      },
+      "body": "【虚构演示政策】目标规格缺货时不能创建换货申请，可更换其他有货规格、改为退货退款或联系人工登记到货通知；已创建的换货申请在取消或检验未通过时释放预留库存。"
+    },
+    {
+      "clause_id": "DEMO-EXCHANGE-PRICE-DIFF",
+      "version": "demo-v1",
+      "title": "不同价格规格的换货",
+      "category": "exchange",
+      "applies_to": {
+        "product_scope": "all_goods",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "any"
+      },
+      "body": "【虚构演示政策】换货仅限同款等价规格。想换成价格不同的规格或其他商品时，需先按普通退货退款，再重新下单购买；不支持补差价或退差价换货。"
+    },
+    {
+      "clause_id": "DEMO-WARRANTY-DIGITAL",
+      "version": "demo-v1",
+      "title": "数码配件保修",
+      "category": "warranty_repair",
+      "applies_to": {
+        "product_scope": "digital_goods",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "any"
+      },
+      "body": "【虚构演示政策】鼠标、键盘、数据线、耳机、充电宝等数码配件自签收日起保修1年，保修期内非人为性能故障免费维修或更换同款；保修以序列号或订单记录为准。"
+    },
+    {
+      "clause_id": "DEMO-WARRANTY-APPLIANCE",
+      "version": "demo-v0",
+      "title": "小家电保修（历史版本）",
+      "category": "warranty_repair",
+      "applies_to": {
+        "product_scope": "appliances",
+        "effective_from": null,
+        "effective_until": "2026-10-01",
+        "reason_kind": "any"
+      },
+      "body": "【虚构演示政策】仅适用于2026年10月1日之前下单的小家电：整机保修1年，电机、加热管等主要部件保修2年；保修期内非人为故障免费维修。"
+    },
+    {
+      "clause_id": "DEMO-WARRANTY-APPLIANCE",
+      "version": "demo-v1",
+      "title": "小家电保修",
+      "category": "warranty_repair",
+      "applies_to": {
+        "product_scope": "appliances",
+        "effective_from": "2026-10-01",
+        "effective_until": null,
+        "reason_kind": "any"
+      },
+      "body": "【虚构演示政策】适用于2026年10月1日及以后下单的小家电：整机保修2年，电机、加热管等主要部件保修3年；保修期内非人为故障免费维修。"
+    },
+    {
+      "clause_id": "DEMO-REPAIR-PROCESS",
+      "version": "demo-v1",
+      "title": "保修维修流程",
+      "category": "warranty_repair",
+      "applies_to": {
+        "product_scope": "all_goods",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "any"
+      },
+      "body": "【虚构演示政策】提交维修申请并描述故障，按指引寄修；检测中心检测通常需要3个工作日，维修或更换通常在7个工作日内完成后寄回。保修期内的寄修往返运费由商家承担，维修期间不提供备用机。"
+    },
+    {
+      "clause_id": "DEMO-WARRANTY-EXCLUSIONS",
+      "version": "demo-v1",
+      "title": "不在免费保修范围的情况",
+      "category": "warranty_repair",
+      "applies_to": {
+        "product_scope": "all_goods",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "any"
+      },
+      "body": "【虚构演示政策】人为损坏、进水或摔落、私自拆机或非授权维修、超出保修期、序列号被涂改的，不在免费保修范围；可选择付费维修，见DEMO-REPAIR-PAID。"
+    },
+    {
+      "clause_id": "DEMO-REPAIR-PAID",
+      "version": "demo-v1",
+      "title": "付费维修",
+      "category": "warranty_repair",
+      "applies_to": {
+        "product_scope": "all_goods",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "any"
+      },
+      "body": "【虚构演示政策】过保或不在免费保修范围的商品可申请付费维修：检测后先报价，用户确认报价后才维修；不同意报价的可取回商品，寄回运费由用户承担。付费维修更换的部件保修90天。"
+    },
+    {
+      "clause_id": "DEMO-RETURN-SHIPPING-QUALITY",
+      "version": "demo-v1",
+      "title": "质量问题与错发的寄回运费",
+      "category": "shipping",
+      "applies_to": {
+        "product_scope": "all_goods",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "any"
+      },
+      "body": "【虚构演示政策】因质量问题、错发或到货破损寄回商品的，寄回运费由商家承担：请先垫付并保留运单，经人工核实后按实际运费补偿，单次最高20元；系统不自动计算或支付该补偿。"
+    },
+    {
+      "clause_id": "DEMO-SHIPPING-INSURANCE",
+      "version": "demo-v1",
+      "title": "退货运费险",
+      "category": "shipping",
+      "applies_to": {
+        "product_scope": "all_goods",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "any"
+      },
+      "body": "【虚构演示政策】下单时购买了退货运费险的订单，普通退货的寄回运费由保险按规则理赔，在退货签收后自动发起，金额以保险公司核定为准；未购买运费险的普通退货寄回运费是否补偿交由人工判断。"
+    },
+    {
+      "clause_id": "DEMO-REFUND-METHOD",
+      "version": "demo-v1",
+      "title": "退款方式",
+      "category": "refund",
+      "applies_to": {
+        "product_scope": "all_goods",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "any"
+      },
+      "body": "【虚构演示政策】退款原路退回原支付方式：余额支付退回账户余额，银行卡和第三方支付退回原账户；组合支付按各方式实付比例退回。不支持退到其他账户或退现金。"
+    },
+    {
+      "clause_id": "DEMO-REFUND-TIMING",
+      "version": "demo-v1",
+      "title": "退款到账时效",
+      "category": "refund",
+      "applies_to": {
+        "product_scope": "all_goods",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "any"
+      },
+      "body": "【虚构演示政策】退款到账时间从退款执行成功起计算：账户余额即时到账，第三方支付1至3个工作日，银行卡3至7个工作日，以支付机构为准。到账时效不同于退货申请期限，申请期限见各退货条款。"
+    },
+    {
+      "clause_id": "DEMO-REFUND-POINTS-COUPON",
+      "version": "demo-v1",
+      "title": "积分与优惠券的退还",
+      "category": "refund",
+      "applies_to": {
+        "product_scope": "all_goods",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "any"
+      },
+      "body": "【虚构演示政策】整单退货时，下单使用的积分按原数额退回，未过期的优惠券退回账户；部分退货时优惠券不退回，积分按退货商品的分摊比例退回。已过期的优惠券不予补发。"
+    },
+    {
+      "clause_id": "DEMO-REFUND-ONLY",
+      "version": "demo-v1",
+      "title": "仅退款不退货",
+      "category": "refund",
+      "applies_to": {
+        "product_scope": "all_goods",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "any"
+      },
+      "body": "【虚构演示政策】订单未发货取消、物流确认丢件、少量破损且商家同意不退回时，可申请仅退款、无需寄回商品；其余情况需先寄回商品，经签收检验后退款。仅退款同样需要审核。"
+    },
+    {
+      "clause_id": "DEMO-PRICE-PROTECTION",
+      "version": "demo-v1",
+      "title": "价格保护",
+      "category": "price_discount",
+      "applies_to": {
+        "product_scope": "all_goods",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "any"
+      },
+      "body": "【虚构演示政策】签收后7个自然日内，同一商品同一规格在本店降价的，可申请价格保护，退还实付差价；每个商品项限申请一次，差价原路退回。"
+    },
+    {
+      "clause_id": "DEMO-PRICE-PROTECTION-EXCLUSIONS",
+      "version": "demo-v1",
+      "title": "不参与价格保护的情况",
+      "category": "price_discount",
+      "applies_to": {
+        "product_scope": "all_goods",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "any"
+      },
+      "body": "【虚构演示政策】秒杀、直播专享价、限时抢购，以及使用优惠券或满减造成的价格变化不纳入价格保护；赠品、定制商品和预售商品不支持价格保护。"
+    },
+    {
+      "clause_id": "DEMO-DISCOUNT-ALLOCATION",
+      "version": "demo-v1",
+      "title": "订单优惠分摊",
+      "category": "price_discount",
+      "applies_to": {
+        "product_scope": "all_goods",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "any"
+      },
+      "body": "【虚构演示政策】满减、优惠券等订单级优惠按各商品项原价比例分摊，下单时固定。部分退货按分摊后的实付金额退款；退货后剩余商品不再满足满减条件的，不追缴已享受的优惠。"
+    },
+    {
+      "clause_id": "DEMO-GIFT-RETURN",
+      "version": "demo-v1",
+      "title": "赠品退回",
+      "category": "gifts_bundles",
+      "applies_to": {
+        "product_scope": "all_goods",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "any"
+      },
+      "body": "【虚构演示政策】购买商品获赠的赠品需随主商品一并退回；赠品未退回或已使用的，退款时扣除赠品标示价值。不支持单独退赠品，赠品本身有质量问题可申请补发。"
+    },
+    {
+      "clause_id": "DEMO-BUNDLE-PARTIAL",
+      "version": "demo-v1",
+      "title": "套装退货",
+      "category": "gifts_bundles",
+      "applies_to": {
+        "product_scope": "bundles",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "any"
+      },
+      "body": "【虚构演示政策】套装（如桌面礼盒套装）作为一个商品项出售，普通退货需整套退回，不支持拆分退其中一件；组合购买的多个独立商品项可以按件分别退货。套装内单件有质量问题可申请换该单件。"
+    },
+    {
+      "clause_id": "DEMO-PRESALE-DEPOSIT",
+      "version": "demo-v1",
+      "title": "预售定金",
+      "category": "presale_custom",
+      "applies_to": {
+        "product_scope": "presale",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "any"
+      },
+      "body": "【虚构演示政策】预售商品支付的定金，在未支付尾款时不予退还；因商家原因无法发货的，定金全额退还。已付尾款的预售商品发货后按普通退货条款办理。"
+    },
+    {
+      "clause_id": "DEMO-PRESALE-DELAY",
+      "version": "demo-v1",
+      "title": "预售延期发货",
+      "category": "presale_custom",
+      "applies_to": {
+        "product_scope": "presale",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "any"
+      },
+      "body": "【虚构演示政策】预售商品超过承诺发货时间仍未发货的，可申请取消订单并全额退款（含定金），或接受延期发货并获得一张20元无门槛券。"
+    },
+    {
+      "clause_id": "DEMO-CUSTOM-NO-RETURN",
+      "version": "demo-v1",
+      "title": "定制商品退换",
+      "category": "presale_custom",
+      "applies_to": {
+        "product_scope": "custom",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "other"
+      },
+      "body": "【虚构演示政策】定制商品（如照片印制马克杯）按个人要求生产，非质量问题不支持退货和换货；有质量问题或与确认的定制内容不符的，按质量问题处理。"
+    },
+    {
+      "clause_id": "DEMO-NON-RETURNABLE",
+      "version": "demo-v1",
+      "title": "不支持普通退货的商品",
+      "category": "non_returnable",
+      "applies_to": {
+        "product_scope": "non_returnable",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "other"
+      },
+      "body": "【虚构演示政策】以下商品不支持普通退货：拆封后的贴身衣物、已拆封食品、已激活或已发放的礼品卡等虚拟商品、定制商品。有质量问题的仍可按质量问题条款申请。"
+    },
+    {
+      "clause_id": "DEMO-FOOD-RETURN",
+      "version": "demo-v1",
+      "title": "食品退货",
+      "category": "non_returnable",
+      "applies_to": {
+        "product_scope": "food",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "other"
+      },
+      "body": "【虚构演示政策】食品未拆封且在保质期内的，可在签收后7个自然日内普通退货；已拆封食品不支持普通退货。临期、过期、变质或有异物的按质量问题处理，不受拆封限制。"
+    },
+    {
+      "clause_id": "DEMO-LOGISTICS-DELAY",
+      "version": "demo-v1",
+      "title": "物流延迟",
+      "category": "logistics",
+      "applies_to": {
+        "product_scope": "all_goods",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "any"
+      },
+      "body": "【虚构演示政策】超过页面承诺送达时间48小时仍未送达的，可申请取消未签收订单并全额退款，或继续等待并获得一张10元无门槛券补偿；补偿券每个订单限一张。"
+    },
+    {
+      "clause_id": "DEMO-SIGNED-NOT-RECEIVED",
+      "version": "demo-v1",
+      "title": "显示签收但未收到",
+      "category": "logistics",
+      "applies_to": {
+        "product_scope": "all_goods",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "any"
+      },
+      "body": "【虚构演示政策】物流显示已签收但本人未收到的，请在显示签收后48小时内反馈，客服创建调查工单向承运商核实签收凭证；核实前不认定丢失责任，不先行退款。"
+    },
+    {
+      "clause_id": "DEMO-LOGISTICS-LOST",
+      "version": "demo-v1",
+      "title": "包裹丢失",
+      "category": "logistics",
+      "applies_to": {
+        "product_scope": "all_goods",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "any"
+      },
+      "body": "【虚构演示政策】承运商确认包裹丢失，或运输轨迹中断超过7天经核实无法找回的，可选择重新发货或全额退款，无需寄回；疑似丢件但尚未确认的，先登记调查。"
+    },
+    {
+      "clause_id": "DEMO-REJECT-DELIVERY",
+      "version": "demo-v1",
+      "title": "拒收",
+      "category": "logistics",
+      "applies_to": {
+        "product_scope": "all_goods",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "any"
+      },
+      "body": "【虚构演示政策】配送时可以当面拒收：外包装破损或商品明显损坏的拒收不收取运费；无理由拒收的，商品退回仓库签收后退款，原订单运费不退。"
+    },
+    {
+      "clause_id": "DEMO-INVOICE-ISSUE",
+      "version": "demo-v1",
+      "title": "发票开具",
+      "category": "invoice",
+      "applies_to": {
+        "product_scope": "all_goods",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "any"
+      },
+      "body": "【虚构演示政策】订单默认提供电子普通发票，签收后30天内可在订单中申请或修改抬头；需要增值税专用发票的请联系人工。发票金额为扣除优惠后的实付金额。"
+    },
+    {
+      "clause_id": "DEMO-INVOICE-RETURN",
+      "version": "demo-v1",
+      "title": "退货时的发票处理",
+      "category": "invoice",
+      "applies_to": {
+        "product_scope": "all_goods",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "any"
+      },
+      "body": "【虚构演示政策】退货退款时，已开具的电子发票自动红冲作废；已开具纸质专用发票的，需将发票随商品一并寄回，未寄回的，退款可能延迟到发票处理完成后。"
+    },
+    {
+      "clause_id": "DEMO-SERVICE-CHANNEL",
+      "version": "demo-v1",
+      "title": "售后渠道与人工服务时间",
+      "category": "service",
+      "applies_to": {
+        "product_scope": "all_goods",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "any"
+      },
+      "body": "【虚构演示政策】售后可通过在线对话办理或转人工。人工客服服务时间为每天9:00至21:00，非服务时间提交的工单在次日处理；工单首次响应时间不超过24小时。"
+    },
+    {
+      "clause_id": "DEMO-SERVICE-ESCALATION",
+      "version": "demo-v1",
+      "title": "处理结果复核",
+      "category": "service",
+      "applies_to": {
+        "product_scope": "all_goods",
+        "effective_from": null,
+        "effective_until": null,
+        "reason_kind": "any"
+      },
+      "body": "【虚构演示政策】对审核或处理结果不满意的，可在结果通知后7个自然日内申请复核，由其他客服重新审核；复核期间原结论暂不执行退款，复核结果为最终处理意见。"
     }
-  ]
+  ],
+  "categories": {
+    "return": "退货期限与条件",
+    "opened_trial": "拆封与试用",
+    "quality": "质量问题",
+    "exchange": "换货",
+    "warranty_repair": "保修与维修",
+    "shipping": "运费",
+    "refund": "退款金额、方式与到账时效",
+    "price_discount": "价保与优惠分摊",
+    "gifts_bundles": "赠品与套装",
+    "presale_custom": "预售与定制",
+    "non_returnable": "特殊不退商品",
+    "logistics": "物流异常",
+    "invoice": "发票",
+    "service": "售后渠道与人工服务"
+  }
 }

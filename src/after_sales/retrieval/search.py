@@ -18,13 +18,15 @@ def find_conflicts(clauses: list[dict]) -> list[list[dict]]:
         groups.setdefault(policy_family(clause), []).append(clause)
     # 同等适用却有不同规则/正文时不能按检索分数或版本号擅自裁决。
     return [group for group in groups.values() if len(group) > 1 and any(
-        (p["rules"], p["body"]) != (group[0]["rules"], group[0]["body"]) for p in group[1:])]
+        (p.get("rules"), p["body"]) != (group[0].get("rules"), group[0]["body"]) for p in group[1:])]
 
 
 def applicability(clause: dict, *, sku: str | None, ordered_on: str | None,
                   reason_kind: str | None) -> tuple[bool, set[str]]:
     """先排除已知不适用条件，再返回真正需要澄清的信息。"""
     scope = clause["applies_to"]
+    # all_products 表示与具体商品无关的通用条款（如运费、发票），不需要先确定商品。
+    any_product = clause["product_scope"].get("all_products", False)
     if sku and sku not in clause["product_scope"]["skus"]:
         return False, set()
     if reason_kind and scope["reason_kind"] not in ("any", reason_kind):
@@ -33,7 +35,7 @@ def applicability(clause: dict, *, sku: str | None, ordered_on: str | None,
     if ordered_on and ((start and ordered_on < start) or (end and ordered_on >= end)):
         return False, set()
     missing = set()
-    if not sku:
+    if not sku and not any_product:
         missing.add("sku")
     if (start or end) and not ordered_on:
         missing.add("ordered_on")
