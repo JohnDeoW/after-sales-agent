@@ -30,8 +30,8 @@
 | 模型 | 中转站 GPT 系列（默认 `gpt-6.2-sol`），Responses 接口，配置来自本目录 `.env`；连接失败与上游 5xx 用 `.with_retry()` 重试一次 | 不变 |
 | 业务存储 | SQLite | 不变 |
 | 政策检索 | SQLite FTS5（中文双字切分）+ 适用性过滤 + 版本冲突检测 | `Document` + 文本切分器、`FastEmbedEmbeddings`（bge-small-zh）+ `Chroma`、jieba `BM25Retriever`、`EnsembleRetriever`、`ParentDocumentRetriever`、索引 API、可选重排序 |
-| 工具调用 | 代码按意图固定选择只读工具 | `create_agent` 子图 + 调用上限中间件自主选择只读工具；只读工具同时以 MCP 服务提供 |
-| 可观测 | `BaseCallbackHandler` 从节点、模型、工具回调生成页面轨迹 | 页面轨迹 + 本地 Arize Phoenix（OpenTelemetry + OpenInference 自动埋点） |
+| 工具调用 | 12 个只读查询均为 LangChain `@tool`（白名单 `tools/registry.py`），会话身份经运行配置注入；代码按意图选择工具 | `create_agent` 子图 + 调用上限中间件自主选择只读工具；只读工具同时以 MCP 服务提供 |
+| 可观测 | `BaseCallbackHandler` 生成页面轨迹；可选本地 Arize Phoenix（`phoenix.otel.register` + `LangChainInstrumentor` 自动埋点，`.env` 开关，默认关闭） | 不变 |
 | 页面 | FastAPI 提供静态 HTML/CSS/原生 JS 模块，无构建工程；SSE 流式事件 | 完善界面与排版设计，作为展示全部能力的主入口（见第 14 节） |
 | 验证 | pytest 业务测试（本地）；`evals/replay.py` 离线/真实模型场景回放（13 个场景） | 检索评测与 RAG 方案对比 |
 
@@ -100,8 +100,8 @@ flowchart LR
 | 自建事件队列与 `emit` 回调推送进度 | `graph.stream(stream_mode=["messages", "updates", "custom"])` | 2 | 当前 |
 | `Run.call` 手动包装每个节点、模型和工具调用以记录轨迹 | 自定义 `BaseCallbackHandler` 从回调生成页面轨迹；预算用 `recursion_limit` 与回调计数 | 2 | 当前 |
 | 手写的连接失败重试循环 | `.with_retry(retry_if_exception_type=...)` | 2 | 当前 |
-| 无外部追踪 | Phoenix + `LangChainInstrumentor` 自动埋点 | 3 | 目标 |
-| 部分只读查询直接调用服务 | 全部改为 `@tool`，身份经运行配置注入 | 4 | 目标 |
+| 无外部追踪 | Phoenix + `LangChainInstrumentor` 自动埋点 | 3 | 当前 |
+| 部分只读查询直接调用服务 | 全部改为 `@tool`，身份经运行配置注入 | 4 | 当前 |
 | 按意图固定选择工具 | `create_agent` 子图 + `ToolCallLimitMiddleware` / `ModelCallLimitMiddleware` | 4 | 目标 |
 | 无 | MCP Python SDK 服务 + `langchain-mcp-adapters` | 5 | 目标 |
 | 自建 FTS5 索引与双字切分 | `Document`、`MarkdownHeaderTextSplitter`、`RecursiveCharacterTextSplitter`、jieba `BM25Retriever` | 8 | 目标 |
@@ -114,14 +114,15 @@ flowchart LR
 
 保留为领域代码、但运行在图节点或 Runnable 中的部分：资格与金额计算、方案版本与授权、幂等写入与退款核对、政策适用性过滤与版本冲突检测、模型故障分类与中文提示。
 
-## 7. 可观测性（目标，阶段 3）
+## 7. 可观测性（当前）
 
-- **页面轨迹（当前）：** 由回调处理器生成，脱敏后给用户查看，见第 4.2 节。
-- **Phoenix：** 本地运行 Arize Phoenix，通过 `phoenix.otel.register`（OpenTelemetry 导出）与 `LangChainInstrumentor`（OpenInference 自动埋点）记录完整调用链；由 `.env` 开关控制，默认关闭；可配置隐藏模型输入输出。Phoenix 面向开发调试与评测，页面轨迹面向用户，两者并存。发送协议为标准 OTLP，以后可改接其他兼容平台。
+- **页面轨迹：** 由回调处理器生成，脱敏后给用户查看，见第 4.2 节。
+- **Phoenix：** 可选依赖组 `observability`。本地运行 Arize Phoenix，通过 `phoenix.otel.register`（OpenTelemetry 导出）与 `LangChainInstrumentor`（OpenInference 自动埋点）记录完整调用链；由 `.env` 开关控制，默认关闭；可配置隐藏模型输入输出。Phoenix 面向开发调试与评测，页面轨迹面向用户，两者并存。发送协议为标准 OTLP，以后可改接其他兼容平台。开启后页面轨迹面板提供 Phoenix 入口；服务关闭时推送剩余 span。
+- **密钥与隐私：** 模型的 API 密钥以 `SecretStr` 保存，不进入 span；`PHOENIX_HIDE_IO=true` 时隐藏消息、输入输出、工具定义与检索文档原文。
 
 ## 8. Agent 工具调用与 MCP（目标，阶段 4—5）
 
-- 订单、物流、库存、政策检索、案件、退货申请、换货申请、工单等只读查询全部为 LangChain 工具；会话身份通过运行配置注入，不是模型可填写的参数。
+- （当前）订单、物流、库存、政策检索、案件、退货申请、换货申请、工单等只读查询全部为 LangChain 工具；工具函数声明 `config: RunnableConfig`，由 LangChain 注入会话身份，不出现在参数 schema 中，缺少会话时拒绝查询。
 - 主图中的只读查询环节由 `create_agent` 构建的子图承担：模型在工具白名单内自行决定调用哪些、调用几次，调用次数由中间件限制。
 - 退款、创建申请、确认、审批、工单写入仍是确定性节点，模型无法调用。
 - 只读工具以 MCP 服务（stdio 与 HTTP）提供，复用相同的业务查询与身份校验；Agent 用 `MultiServerMCPClient` 加载 MCP 工具，直接调用与经 MCP 调用结果一致。
@@ -165,7 +166,8 @@ flowchart LR
 ## 10. 可观测与评测
 
 - **当前：** 回调处理器每轮生成运行轨迹（节点、模型与工具调用、参数摘要、结果、政策引用、耗时、token、重试次数、模型故障分类与首个数据耗时、暂停与恢复点），网页右侧可查看；服务端日志记录模型故障与慢调用，不含密钥和用户原文。
-- **目标：** 开发调试与评测使用本地 Phoenix；检索评测在开启 Phoenix 时同时记录为实验。
+- **Phoenix（当前）：** 开发调试时查看完整调用链。
+- **目标：** 检索评测在开启 Phoenix 时同时记录为实验。
 - **评测入口：** `evals/replay.py` 提供离线（固定模型提取结果）与真实模型两种场景回放，目标增加检索评测模式。离线结果不能代表真实模型的理解能力。
 
 ## 11. 演示业务规则
@@ -215,7 +217,8 @@ after-sales-agent/
 │   │   ├── preview.py    # 从 messages 流提取答复草稿
 │   │   └── runtime.py    # 预算配置、错误类型、模型故障分类、轨迹摘要
 │   ├── domain/       # 规则、金额、方案、申请、审批、退款、换货、工单、消息卡片
-│   ├── tools/        # LangChain 只读工具
+│   ├── tools/        # LangChain 只读工具、白名单与会话身份注入
+│   ├── observability.py  # 可选的本地 Phoenix 追踪
 │   ├── retrieval/    # 政策加载、索引、检索与适用性过滤
 │   └── storage/      # SQLite 表结构、种子数据与读写
 ├── web/              # 静态页面与原生 JS 模块
@@ -225,7 +228,7 @@ after-sales-agent/
 └── artifacts/        # 回放与评测的机器结果（不提交）
 ```
 
-目标阶段预计新增：Phoenix 开关与初始化、MCP 服务入口、政策长文档与常见问答数据、检索链模块、检索评测样例；向量库与索引记录存放在 `data/`（不提交）。按任务实际创建，不提前搭空模块。
+目标阶段预计新增：MCP 服务入口、政策长文档与常见问答数据、检索链模块、检索评测样例；向量库与索引记录存放在 `data/`（不提交）。按任务实际创建，不提前搭空模块。
 
 ## 14. 前端展示（目标）
 

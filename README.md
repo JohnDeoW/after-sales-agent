@@ -132,7 +132,7 @@ uv run python -X utf8 evals/replay.py --mode live --select holdout
 
 `--select` 支持场景 ID、组名以及逗号分隔选择；`core` 为除独立检查组外的十一个场景（退货退款、补问、超期、审批、转人工、故障、换货、物流），`all` 包含全部十三个场景。例如 `--select exchange,logistics` 只运行换货与物流的四个场景。离线通过不能作为真实模型理解能力的结论；检查结果中的 `passed`、最终状态与失败步骤，而不是比较回复文字是否逐字相同。
 
-运行全部业务测试（pytest 统一入口，不调用模型、不发起网络请求，约 1 分钟）：
+运行全部业务测试（pytest 统一入口，不调用模型、不发起网络请求，约 1 分钟；`tests/` 只在本地开发环境中保留，不随仓库发布）：
 
 ```powershell
 uv run pytest
@@ -147,11 +147,40 @@ uv run after-sales-model-check --mode text
 
 还支持 `--mode stream`、`--mode tool` 和 `--mode all`。不必每次启动都运行全套检查。
 
+### 3.1 本地 Phoenix 调用链追踪（可选）
+
+需要查看完整调用链（图节点、每次模型调用的输入输出与 token、每次工具调用）时，可开启本地 [Arize Phoenix](https://github.com/Arize-ai/phoenix)。默认关闭，关闭时不连接任何追踪服务。
+
+1. 安装可选依赖（只需一次）：
+
+   ```powershell
+   uv sync --extra observability
+   ```
+
+2. 在另一个终端启动本地 Phoenix，保持运行，浏览器打开 [http://localhost:6006/](http://localhost:6006/)：
+
+   ```powershell
+   uv run phoenix serve
+   ```
+
+3. 在 `.env` 中开启并重启服务：
+
+   ```dotenv
+   PHOENIX_ENABLED=true
+   # 以下可选
+   PHOENIX_COLLECTOR_ENDPOINT=http://localhost:6006/v1/traces
+   PHOENIX_PROJECT_NAME=after-sales-agent
+   PHOENIX_HIDE_IO=false
+   ```
+
+开启后，网页右侧“运行轨迹”顶部会出现“在 Phoenix 中查看完整调用链”的链接，在 Phoenix 的 `after-sales-agent` 项目中查看每轮对话。`PHOENIX_HIDE_IO=true` 时隐藏模型消息、输入输出与检索原文，只保留结构、耗时和 token。API 密钥不会出现在任何追踪记录中。页面轨迹是给用户看的脱敏摘要，Phoenix 用于开发调试与评测，两者并存。
+
 ## 4. 常见情况
 
 | 现象 | 如何处理 |
 | --- | --- |
 | 提示未配置 `LLM_API_KEY` | 检查本项目 `.env`，不要把文件放到父目录；配置后重启 |
+| 开启 Phoenix 后启动报错“未安装可观测性依赖” | 运行 `uv sync --extra observability` 后重启；不需要追踪时把 `PHOENIX_ENABLED` 改回 `false` |
 | 提示数据库或政策索引不存在 | 执行初始化、索引重建；自定义库则核对启动命令里的数据库路径 |
 | 端口被占用 | 在原服务终端停止服务，或选其他端口；不要同时向同一端口启动两个服务 |
 | 提示“模型响应超时”（HTTP 504） | 模型在 `LLM_TIMEOUT_SECONDS` 内没有返回结果，多为模型或中转站响应慢。本轮消息未保存、已有信息保留，输入框保留原文，稍后重发即可。经常出现时可适当调大该配置并重启 |
