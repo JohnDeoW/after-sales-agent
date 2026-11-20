@@ -175,11 +175,33 @@ uv run after-sales-model-check --mode text
 
 开启后，网页右侧“运行轨迹”顶部会出现“在 Phoenix 中查看完整调用链”的链接，在 Phoenix 的 `after-sales-agent` 项目中查看每轮对话。`PHOENIX_HIDE_IO=true` 时隐藏模型消息、输入输出与检索原文，只保留结构、耗时和 token。API 密钥不会出现在任何追踪记录中。页面轨迹是给用户看的脱敏摘要，Phoenix 用于开发调试与评测，两者并存。
 
+### 3.2 只读工具 MCP 服务（可选）
+
+订单、物流、库存、案件、退货申请、换货申请、工单这 12 个只读查询工具同时以 [MCP](https://modelcontextprotocol.io/) 协议提供，供 MCP 客户端（如 MCP Inspector、桌面 AI 助手）发现和调用。只开放只读工具，确认、提交、退款、审批等写操作不通过 MCP 开放。会话身份不是工具参数，缺少身份时拒绝查询，且只能查到该会话用户本人的记录。
+
+- **HTTP（随网页服务启动）：** 地址为 `http://127.0.0.1:8000/mcp/`（Streamable HTTP）。请求头 `X-After-Sales-Session` 填写服务端会话编号（网页登录后浏览器 Cookie `after_sales_session` 的值）。
+- **stdio（单独进程，一个进程对应一个会话）：**
+
+  ```powershell
+  uv run after-sales-mcp --transport stdio --session 会话编号
+  ```
+
+  也可用 `--transport http --port 8765` 单独启动 HTTP 服务（地址 `http://127.0.0.1:8765/mcp`）；`--db` 可指定业务库。
+
+**让 Agent 经 MCP 调用工具：** 在 `.env` 设置 `MCP_SERVER_URL` 并重启服务。指向网页服务自带的 MCP 地址即可，不需要另开进程：
+
+```dotenv
+MCP_SERVER_URL=http://127.0.0.1:8000/mcp/
+```
+
+设置后，自然语言查询中由 Agent 选择的只读工具经 MCP 调用，“运行轨迹”中这些工具调用标注“经 MCP”；不设置时直接调用。MCP 服务连接失败时本轮返回错误提示（HTTP 503），不会改用本地工具。页面按钮的固定指令与退货办理的订单查询始终直接调用。
+
 ## 4. 常见情况
 
 | 现象 | 如何处理 |
 | --- | --- |
 | 提示未配置 `LLM_API_KEY` | 检查本项目 `.env`，不要把文件放到父目录；配置后重启 |
+| 提示“无法连接只读工具 MCP 服务”（HTTP 503） | 检查 `.env` 的 `MCP_SERVER_URL` 与网页服务端口一致（默认 `http://127.0.0.1:8000/mcp/`），或单独启动的 MCP 服务仍在运行；不使用 MCP 时删除该配置并重启 |
 | 开启 Phoenix 后启动报错“未安装可观测性依赖” | 运行 `uv sync --extra observability` 后重启；不需要追踪时把 `PHOENIX_ENABLED` 改回 `false` |
 | 提示数据库或政策索引不存在 | 执行初始化、索引重建；自定义库则核对启动命令里的数据库路径 |
 | 端口被占用 | 在原服务终端停止服务，或选其他端口；不要同时向同一端口启动两个服务 |

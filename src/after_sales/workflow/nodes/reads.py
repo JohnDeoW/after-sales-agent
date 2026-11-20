@@ -172,6 +172,8 @@ def query_agent(s: State, runtime: Runtime[TurnContext]) -> dict:
     if not lookups:
         if outcome["invalid"]:
             text = INVALID_REPLY
+        elif outcome.get("failed"):
+            text = "查询暂时没有成功，请稍后重试或提供具体编号。"
         elif outcome["limited"]:
             text = "本轮查询请求超出调用上限，已停止。请分开询问或提供具体编号。"
         else:

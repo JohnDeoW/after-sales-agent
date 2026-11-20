@@ -115,7 +115,8 @@ def stream_message(body: SendMessage, request: Request, service: Service, sessio
             from after_sales.agent.intake import IntakeUnavailable
             from after_sales.domain.proposals import ProposalConflict, ProposalNotFound
             from after_sales.workflow.runtime import WorkflowStopped
-            known = isinstance(exc, (IntakeUnavailable, WorkflowStopped, ProposalConflict, ProposalNotFound))
+            from after_sales.agent.mcp_tools import MCPUnavailable
+            known = isinstance(exc, (IntakeUnavailable, WorkflowStopped, ProposalConflict, ProposalNotFound, MCPUnavailable))
             queue.put({"type": "error", "detail": str(exc) if known else "本轮处理未完成，请刷新记录核对结果。",
                        "workflow": getattr(exc, "workflow", None)})
         finally:

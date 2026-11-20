@@ -23,6 +23,8 @@ from after_sales.agent.intake import RequestExtractor, IntakeUnavailable
 from after_sales.agent.policy import PolicyExplainer
 from after_sales.agent.llm import create_model
 from after_sales.agent.query_agent import RuleToolSelector
+from after_sales.agent.mcp_tools import MCPToolProvider, MCPUnavailable
+from after_sales.mcp_server import create_mcp_server, http_app
 from after_sales.retrieval.index import INDEX_PATH
 from after_sales.domain.customer_service import CustomerService, InvalidCustomer, InvalidSession
 from after_sales.workflow.graph import AfterSalesWorkflow
@@ -45,10 +47,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     limits = Limits()
     # 一轮最多两次模型调用；随单次超时同步预算，另留业务处理时间。
     limits = replace(limits, turn_seconds=limits.max_model_calls * app.state.settings.llm_timeout_seconds + 15)
+    mcp = MCPToolProvider(app.state.settings.mcp_server_url) if app.state.settings.mcp_server_url else None
     app.state.workflow = AfterSalesWorkflow(app.state.customer_service, extractor,
                                            limits=limits, policy_explainer=explainer, policy_index_path=app.state.policy_index_path,
-                                           tool_selector=selector)
-    yield
+                                           tool_selector=selector, mcp=mcp)
+    # 挂载在 /mcp/ 的只读工具 MCP 服务需要运行自己的会话管理器。
+    async with app.state.mcp_app.router.lifespan_context(app.state.mcp_app):
+        yield
     app.state.workflow.close()
     flush_traces()
 
@@ -61,12 +66,15 @@ def create_app(db_path: Path = DEMO_DB_PATH, *, extractor=None, policy_explainer
     application.state.policy_explainer = policy_explainer
     application.state.policy_index_path = policy_index_path
     application.state.tool_selector = tool_selector
+    # 只读工具 MCP 服务（Streamable HTTP），身份取请求头 X-After-Sales-Session。
+    application.state.mcp_app = http_app(create_mcp_server(db_path))
     application.include_router(router)
     application.include_router(support_router)
     application.include_router(return_event_router)
     application.include_router(exchange_router)
     application.include_router(web_router)
     application.mount("/static", StaticFiles(directory=WEB_ROOT), name="static")
+    application.mount("/mcp", application.state.mcp_app, name="mcp")
 
     @application.middleware("http")
     async def revalidate_static(request, call_next):
@@ -92,6 +100,10 @@ def create_app(db_path: Path = DEMO_DB_PATH, *, extractor=None, policy_explainer
     @application.exception_handler(IntakeUnavailable)
     async def intake_unavailable_handler(request, exc: IntakeUnavailable) -> JSONResponse:
         # 超时 504、限流 429，其余模型故障 502；分类详情同时写入轨迹 error_detail。
+        return JSONResponse(error_body(exc), status_code=exc.status_code)
+
+    @application.exception_handler(MCPUnavailable)
+    async def mcp_unavailable_handler(request, exc: MCPUnavailable) -> JSONResponse:
         return JSONResponse(error_body(exc), status_code=exc.status_code)
 
     @application.exception_handler(ProposalNotFound)

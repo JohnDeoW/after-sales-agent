@@ -26,6 +26,7 @@ TOOL_TAG = "tool_call"
 
 class TraceHandler(BaseCallbackHandler):
     raise_error = True
+    run_inline = True  # 异步子图（经 MCP 的查询）中也按发生顺序同步记录
 
     def __init__(self, limits: Limits):
         self.limits = limits
@@ -138,6 +139,8 @@ class TraceHandler(BaseCallbackHandler):
         owner = self._owner(parent_run_id, "tool")
         if owner is None:
             self._start(run_id, "tool", (serialized or {}).get("name") or kwargs.get("name"), inputs)
+            if "mcp" in (tags or []):
+                self._open[run_id][0]["via"] = "mcp"
         else:
             # Agent 工具内部的白名单工具重试：记在外层工具事件上。
             attempt = next((int(t.rsplit(":", 1)[1]) for t in tags or [] if t.startswith("retry:attempt:")), None)

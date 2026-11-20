@@ -81,7 +81,7 @@ def build_graph(checkpointer=None):
 
 class AfterSalesWorkflow:
     def __init__(self, customers, extractor, limits: Limits | None = None, *, policy_explainer=None,
-                 policy_index_path=INDEX_PATH, tool_selector=None):
+                 policy_index_path=INDEX_PATH, tool_selector=None, mcp=None):
         self.customers = customers
         self.extractor = extractor
         self.limits = limits or Limits()
@@ -94,7 +94,7 @@ class AfterSalesWorkflow:
         self.policy_explainer = policy_explainer
         self.policy_tool = create_search_policy_tool(policy_index_path)
         # 只读查询 Agent：真实模型或离线替身选择模型（RuleToolSelector）。
-        self.query_agent = QueryAgent(tool_selector or RuleToolSelector())
+        self.query_agent = QueryAgent(tool_selector or RuleToolSelector(), mcp)
         # 检查点与业务数据在同一个本地库文件中，按会话保存图状态。
         connection = sqlite3.connect(customers.db_path, check_same_thread=False, timeout=5)
         self.checkpointer = SqliteSaver(connection, serde=SERDE)

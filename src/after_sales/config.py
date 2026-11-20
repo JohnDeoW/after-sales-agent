@@ -34,6 +34,8 @@ class Settings:
     phoenix_endpoint: str = "http://localhost:6006/v1/traces"
     phoenix_project_name: str = "after-sales-agent"
     phoenix_hide_io: bool = False
+    # 只读工具 MCP 服务地址；设置后 Agent 经 MCP 调用只读工具，为空时直接调用。
+    mcp_server_url: str = ""
 
 
 def load_settings() -> Settings:
@@ -71,4 +73,5 @@ def load_settings() -> Settings:
         phoenix_endpoint=(values.get("PHOENIX_COLLECTOR_ENDPOINT") or "http://localhost:6006/v1/traces").strip(),
         phoenix_project_name=(values.get("PHOENIX_PROJECT_NAME") or "after-sales-agent").strip(),
         phoenix_hide_io=flag("PHOENIX_HIDE_IO"),
+        mcp_server_url=(values.get("MCP_SERVER_URL") or "").strip(),
     )

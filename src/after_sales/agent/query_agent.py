@@ -7,17 +7,20 @@
 - 写操作（确认、提交、退款、审批）不在工具列表中，模型无法调用。
 """
 
+import asyncio
 import json
+import threading
 
 from langchain.agents import create_agent
 from langchain.agents.middleware import ModelCallLimitMiddleware, ToolCallLimitMiddleware
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
-from langchain_core.runnables import RunnableConfig
+from langchain_core.runnables import RunnableConfig, ensure_config
 from langchain_core.tools import StructuredTool
 
 from after_sales.tools.registry import READ_ONLY_TOOLS
+from after_sales.tools.scope import scope
 
 AGENT_NAME = "QueryAgent"
 MAX_MODEL_CALLS = 1
@@ -36,41 +39,72 @@ PROMPT = f"""你是售后系统的只读查询工具选择器，只调用工具�
 """
 
 
-def _agent_tool(base) -> StructuredTool:
+def _agent_tool(base, mcp=None) -> StructuredTool:
+    """Agent 可见的工具：参数 schema 与白名单工具相同；执行方式为直接调用或经 MCP 调用。"""
+    common = dict(name=base.name, description=base.description, args_schema=base.args_schema,
+                  response_format="content_and_artifact", return_direct=True)
+    if mcp is not None:
+        async def arun(config: RunnableConfig, **args):
+            _, session_id = scope(config)
+            return "已查询", await mcp.call(base.name, args, session_id)
+        # MCP 返回的查询错误交给 Agent 作为失败结果；连接失败（MCPUnavailable）直接中止本轮。
+        return StructuredTool.from_function(coroutine=arun, handle_tool_error=True, tags=["mcp"], **common)
+
     from after_sales.workflow.nodes.common import read
 
     def run(config: RunnableConfig, **args):
         # 只读查询的临时失败沿用工作流的重试与转人工规则。
         return "已查询", read(base.name, base, args)
-    return StructuredTool.from_function(func=run, name=base.name, description=base.description,
-                                        args_schema=base.args_schema, response_format="content_and_artifact",
-                                        return_direct=True)
+    return StructuredTool.from_function(func=run, **common)
+
+
+class _BackgroundLoop:
+    """常驻事件循环：异步模型客户端与 MCP 连接在多轮之间复用同一个循环，避免每轮新建循环后旧连接失效。"""
+
+    def __init__(self):
+        self.loop = asyncio.new_event_loop()
+        threading.Thread(target=self.loop.run_forever, name="query-agent-loop", daemon=True).start()
+
+    def run(self, coroutine):
+        return asyncio.run_coroutine_threadsafe(coroutine, self.loop).result()
 
 
 class QueryAgent:
-    def __init__(self, model: BaseChatModel):
+    def __init__(self, model: BaseChatModel, mcp=None):
+        self.mcp = mcp
+        self._loop = _BackgroundLoop() if mcp is not None else None
         self.graph = create_agent(
-            model, [_agent_tool(tool) for tool in READ_ONLY_TOOLS.values()], system_prompt=PROMPT, name=AGENT_NAME,
+            model, [_agent_tool(tool, mcp) for tool in READ_ONLY_TOOLS.values()], system_prompt=PROMPT, name=AGENT_NAME,
+            # 每轮独立的查询子图，不继承主图检查点（主图检查点只保存会话图状态）。
+            checkpointer=False,
             middleware=[ModelCallLimitMiddleware(run_limit=MAX_MODEL_CALLS, exit_behavior="end"),
                         ToolCallLimitMiddleware(run_limit=MAX_TOOL_CALLS, exit_behavior="continue")])
 
     def run(self, content: str, facts: dict) -> dict:
-        """返回成功的查询 [(工具名, 参数, 结果)]，以及是否因调用上限或参数无效而停止。"""
-        state = self.graph.invoke({"messages": [HumanMessage(json.dumps({"message": content, **facts}, ensure_ascii=False))]})
+        """返回成功的查询 [(工具名, 参数, 结果)]，以及是否因调用上限、参数无效或查询失败而停止。"""
+        messages = {"messages": [HumanMessage(json.dumps({"message": content, **facts}, ensure_ascii=False))]}
+        if self.mcp:
+            # MCP 工具只支持异步调用：在常驻事件循环中运行子图，并显式传入当前运行配置（会话身份、轨迹回调）。
+            state = self._loop.run(self.graph.ainvoke(messages, ensure_config()))
+        else:
+            state = self.graph.invoke(messages)
         calls = {call["id"]: call for message in state["messages"] if isinstance(message, AIMessage)
                  for call in message.tool_calls}
-        lookups, limited, invalid = [], False, False
+        lookups, limited, invalid, failed = [], False, False, False
         for message in state["messages"]:
             if not isinstance(message, ToolMessage):
                 continue
             if message.status == "error":
-                if str(message.content).startswith("Tool call limit"):
+                text = str(message.content)
+                if text.startswith("Tool call limit"):
                     limited = True
+                elif text.startswith("查询失败"):
+                    failed = True
                 else:
                     invalid = True
             elif message.artifact is not None:
                 lookups.append((message.name, calls[message.tool_call_id]["args"], message.artifact))
-        return {"lookups": lookups, "limited": limited, "invalid": invalid}
+        return {"lookups": lookups, "limited": limited, "invalid": invalid, "failed": failed}
 
 
 class RuleToolSelector(BaseChatModel):
