@@ -22,6 +22,13 @@ after-sales-model-check = "after_sales.model_check:run"
 after-sales-init-db = "after_sales.storage.seed:run"
 after-sales-policy-index = "after_sales.retrieval.index:run"
 
+[project.optional-dependencies]
+observability = [
+    "arize-phoenix>=22.0.0",
+    "arize-phoenix-otel>=0.17.3",
+    "openinference-instrumentation-langchain>=0.1.88",
+]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/after_sales"]
 

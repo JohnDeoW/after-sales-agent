@@ -5,12 +5,13 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from dataclasses import replace
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 
 from after_sales.config import load_settings
+from after_sales.observability import setup_tracing, flush as flush_traces
 from after_sales.api.customer import router
 from after_sales.api.support import router as support_router
 from after_sales.domain.approvals import SupportRequired
@@ -31,6 +32,7 @@ from after_sales.storage.database import DEMO_DB_PATH, initialize_session_storag
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.settings = load_settings()
+    app.state.phoenix_url = setup_tracing(app.state.settings)
     app.state.customer_service.confirmation_ttl_seconds = app.state.settings.confirmation_ttl_seconds
     app.state.customer_service.approval_ttl_seconds = app.state.settings.approval_ttl_seconds
     initialize_session_storage(app.state.customer_service.db_path)
@@ -43,6 +45,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                                            limits=limits, policy_explainer=explainer, policy_index_path=app.state.policy_index_path)
     yield
     app.state.workflow.close()
+    flush_traces()
 
 
 def create_app(db_path: Path = DEMO_DB_PATH, *, extractor=None, policy_explainer=None,
@@ -98,6 +101,11 @@ def create_app(db_path: Path = DEMO_DB_PATH, *, extractor=None, policy_explainer
         return JSONResponse(error_body(exc), status_code=exc.status_code)
 
     application.add_api_route("/health", health, methods=["GET"])
+
+    @application.get("/observability")
+    def observability(request: Request) -> dict:
+        """页面用：Phoenix 已开启时返回本地调用链页面地址，否则为 null。"""
+        return {"phoenix_url": getattr(request.app.state, "phoenix_url", None)}
     return application
 
 

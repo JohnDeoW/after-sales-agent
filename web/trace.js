@@ -39,6 +39,8 @@ const failureNames = { timeout: "响应超时", connection: "连接失败", rate
   output_format: "输出格式无效" };
 
 const label = name => labels[name] || name;
+let phoenixUrl = null;
+fetch("/observability").then(response => response.ok ? response.json() : {}).then(data => { phoenixUrl = data.phoenix_url || null; }).catch(() => {});
 const resultLabel = value => results[value] || statusLabel(value);
 const runTone = status => ["error", "stopped"].includes(status) ? "danger" : status === "workflow_handoff" ? "human" : !status ? "info" : "ok";
 const ms = value => value == null ? "" : value >= 1000 ? `${(value / 1000).toFixed(1)} 秒` : `${Math.round(value)} ms`;
@@ -157,6 +159,12 @@ export function renderTrace(value, progress = null) {
     stats.append(stat);
   }
   head.append(top, stats, el("p", value.id, "item-id"));
+  if (phoenixUrl) {
+    // Phoenix 开启时提供完整调用链入口（本地开发调试用）；页面轨迹仍是脱敏摘要。
+    const link = el("a", "在 Phoenix 中查看完整调用链 ↗", "trace-phoenix");
+    link.href = phoenixUrl; link.target = "_blank"; link.rel = "noopener";
+    head.append(link);
+  }
   root.append(head);
 
   const maxDuration = Math.max(1, ...events.map(event => event.duration_ms || 0));

@@ -29,6 +29,11 @@ class Settings:
     llm_timeout_seconds: int = 120
     confirmation_ttl_seconds: int = 86400
     approval_ttl_seconds: int = 604800
+    # 本地 Phoenix 追踪：默认关闭；隐藏输入输出时 span 中不记录消息与工具参数原文。
+    phoenix_enabled: bool = False
+    phoenix_endpoint: str = "http://localhost:6006/v1/traces"
+    phoenix_project_name: str = "after-sales-agent"
+    phoenix_hide_io: bool = False
 
 
 def load_settings() -> Settings:
@@ -49,6 +54,12 @@ def load_settings() -> Settings:
         except ValueError:
             raise ConfigurationError(f"{name} 必须是正整数秒。") from None
 
+    def flag(name: str) -> bool:
+        value = (values.get(name) or "false").strip().lower()
+        if value not in ("true", "false", "1", "0", "yes", "no"):
+            raise ConfigurationError(f"{name} 只能是 true 或 false。")
+        return value in ("true", "1", "yes")
+
     return Settings(
         llm_api_key=api_key,
         llm_base_url=(values.get("LLM_BASE_URL") or "https://rightapi.ai/v1").strip(),
@@ -56,4 +67,8 @@ def load_settings() -> Settings:
         llm_timeout_seconds=duration("LLM_TIMEOUT_SECONDS", 120),
         confirmation_ttl_seconds=duration("CONFIRMATION_TTL_SECONDS", 86400),
         approval_ttl_seconds=duration("APPROVAL_TTL_SECONDS", 604800),
+        phoenix_enabled=flag("PHOENIX_ENABLED"),
+        phoenix_endpoint=(values.get("PHOENIX_COLLECTOR_ENDPOINT") or "http://localhost:6006/v1/traces").strip(),
+        phoenix_project_name=(values.get("PHOENIX_PROJECT_NAME") or "after-sales-agent").strip(),
+        phoenix_hide_io=flag("PHOENIX_HIDE_IO"),
     )

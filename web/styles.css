@@ -450,3 +450,5 @@ main { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .multi-tab { font-size: var(--fs-sm); color: var(--text-muted); margin: var(--space-4) 0 0; padding-top: var(--space-3); border-top: 1px solid var(--border); display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-3); }
 .multi-tab a { color: var(--brand); font-weight: 600; }
 .multi-tab small { flex-basis: 100%; color: var(--text-faint); }
+
+.trace-phoenix { display: inline-block; margin-top: 6px; font-size: 13px; }
