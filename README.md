@@ -175,6 +175,8 @@ uv run after-sales-model-check --mode text
 
 开启后，网页右侧“运行轨迹”顶部会出现“在 Phoenix 中查看完整调用链”的链接，在 Phoenix 的 `after-sales-agent` 项目中查看每轮对话。`PHOENIX_HIDE_IO=true` 时隐藏模型消息、输入输出与检索原文，只保留结构、耗时和 token。API 密钥不会出现在任何追踪记录中。页面轨迹是给用户看的脱敏摘要，Phoenix 用于开发调试与评测，两者并存。
 
+开启后，Phoenix 包会在用户目录下创建 `.phoenix` 工作目录（Windows 为 `C:\Users\用户名\.phoenix`）；`uv run phoenix serve` 的追踪数据默认也存放在这里，可用环境变量 `PHOENIX_WORKING_DIR` 改到其他位置。不再使用时可直接删除该目录。
+
 ### 3.2 只读工具 MCP 服务（可选）
 
 订单、物流、库存、案件、退货申请、换货申请、工单这 12 个只读查询工具同时以 [MCP](https://modelcontextprotocol.io/) 协议提供，供 MCP 客户端（如 MCP Inspector、桌面 AI 助手）发现和调用。只开放只读工具，确认、提交、退款、审批等写操作不通过 MCP 开放。会话身份不是工具参数，缺少身份时拒绝查询，且只能查到该会话用户本人的记录。
