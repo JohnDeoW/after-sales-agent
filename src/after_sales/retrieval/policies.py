@@ -1,6 +1,7 @@
 """以完整条款为片段，保留正文、规则和可追溯的来源快照。"""
 
 import hashlib
+import re
 import json
 from pathlib import Path
 
@@ -49,3 +50,45 @@ def load_policy_chunks(source_path: Path = POLICY_PATH) -> list[dict]:
             "source_sha256": source_hash,
         })
     return chunks
+
+
+HANDBOOK_PATH = POLICY_PATH.with_name("policy_handbook.md")
+FAQ_PATH = POLICY_PATH.with_name("policy_faq.json")
+REFERENCE = re.compile(r"（依据：([^）]+)）\s*$")
+
+
+def load_handbook_sections(path: Path = HANDBOOK_PATH, source_path: Path = POLICY_PATH) -> list[dict]:
+    """长文档按段落读取：每段带所在章节标题和依据条款；依据缺失或条款不存在时报错。"""
+    clause_ids = {chunk["clause_id"] for chunk in load_policy_chunks(source_path)}
+    sections, headings = [], {}
+    for block in re.split(r"\n\s*\n", path.read_text(encoding="utf-8").strip()):
+        block = block.strip()
+        if block.startswith("#"):
+            level = len(block) - len(block.lstrip("#"))
+            headings = {k: v for k, v in headings.items() if k < level} | {level: block.lstrip("#").strip()}
+            continue
+        if level_one_intro(headings):
+            continue  # 文档开头的说明段落，不属于具体条款
+        match = REFERENCE.search(block)
+        refs = [ref.strip() for ref in match[1].split("、")] if match else []
+        if not refs or not set(refs) <= clause_ids:
+            raise ValueError(f"长文档段落缺少依据或引用了不存在的条款：{block[:30]}")
+        sections.append({"section_id": f"HANDBOOK-{len(sections) + 1:03d}", "headings": [headings[k] for k in sorted(headings)],
+                         "text": block, "clause_ids": refs, "source_path": str(path.resolve())})
+    return sections
+
+
+def level_one_intro(headings: dict) -> bool:
+    return set(headings) == {1}
+
+
+def load_faqs(path: Path = FAQ_PATH, source_path: Path = POLICY_PATH) -> list[dict]:
+    """常见问答：每条带编号和依据条款；条款不存在或编号重复时报错。"""
+    clause_ids = {chunk["clause_id"] for chunk in load_policy_chunks(source_path)}
+    faqs = json.loads(path.read_text(encoding="utf-8"))["faqs"]
+    if len({faq["faq_id"] for faq in faqs}) != len(faqs):
+        raise ValueError("常见问答编号重复。")
+    for faq in faqs:
+        if not faq["clause_ids"] or not set(faq["clause_ids"]) <= clause_ids:
+            raise ValueError(f"常见问答引用了不存在的条款：{faq['faq_id']}")
+    return faqs
