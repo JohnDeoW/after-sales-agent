@@ -9,7 +9,7 @@ from after_sales.domain.customer_service import CustomerService, _session_user
 from after_sales.domain.returns import evaluate_return, assessment_reply, assessment_status
 from after_sales.domain.policy_rules import references_text
 from after_sales.storage.database import connect_database, read_order, append_messages
-from after_sales.storage.case_progress import save_state
+from after_sales.storage.case_progress import save_state, case_state
 from after_sales.domain.authorizations import expires_at, snapshot, valid, invalidate
 
 
@@ -107,12 +107,11 @@ class ProposalService:
     def current(self, session_id: str) -> dict:
         with connect_database(self.customers.db_path) as connection:
             _session_user(connection, session_id)
-            context = connection.execute("SELECT * FROM conversation_states WHERE session_id = ?", (session_id,)).fetchone()
-            if context is None:
+            case_id, state = case_state(connection, session_id)
+            if case_id is None:
                 return {"proposal": None}
-            state = json.loads(context["state_json"])
             row = connection.execute("SELECT * FROM proposals WHERE id = ? AND case_id = ?",
-                                     (state.get("proposal_id"), context["case_id"])).fetchone()
+                                     (state.get("proposal_id"), case_id)).fetchone()
             return {"proposal": proposal_view(row) if row else None}
 
     def decide(self, session_id: str, action: str, proposal_id: str | None = None,
@@ -121,15 +120,13 @@ class ProposalService:
         with connect_database(self.customers.db_path) as connection:
             connection.execute("BEGIN IMMEDIATE")
             user = _session_user(connection, session_id)
-            context = connection.execute("SELECT * FROM conversation_states WHERE session_id = ?", (session_id,)).fetchone()
-            if context is None or context["case_id"] is None:
+            case_id, state = case_state(connection, session_id)
+            if case_id is None:
                 raise ProposalNotFound("当前会话没有待办理的退货案件。")
-            case_id = context["case_id"]
             if expected_case_id is not None:
                 progress = connection.execute("SELECT revision FROM case_progress WHERE case_id=?", (case_id,)).fetchone()
                 if case_id != expected_case_id or progress is None or progress["revision"] != expected_revision:
                     raise ProposalConflict("识别期间案件已切换或更新，请查看最新进度后重新决定。")
-            state = json.loads(context["state_json"])
             current = connection.execute("SELECT * FROM proposals WHERE id = ? AND case_id = ?",
                                          (state.get("proposal_id"), case_id)).fetchone()
             if proposal_id is not None:

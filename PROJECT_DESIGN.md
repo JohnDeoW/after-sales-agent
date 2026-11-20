@@ -1,8 +1,8 @@
 # 商品售后服务 Agent：项目方案
 
-本文件说明项目定位、当前架构、目标架构和关键设计取舍。安装与使用见 [README.md](README.md)，演示数据与测试步骤见 [售后模拟测试指南](DEMO_TEST_GUIDE.md)，任务与完成标准见 [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md)，约束见 [PROJECT_RULES.md](PROJECT_RULES.md)。
+本文件说明项目定位、当前架构、目标架构和关键设计取舍。安装与使用见 [README.md](README.md)，演示数据与测试步骤见 [售后模拟测试指南](DEMO_TEST_GUIDE.md)。
 
-文中标注“当前”的部分已经实现；标注“目标”的部分是计划，以开发计划的勾选状态为准。
+文中标注“当前”的部分已经实现；标注“目标”的部分是后续计划。
 
 ## 1. 定位
 
@@ -26,14 +26,14 @@
 | --- | --- | --- |
 | 环境 | 独立 uv 项目，`pyproject.toml`、`uv.lock`、`.venv` | 不变 |
 | 后端 | Python、FastAPI、Pydantic | 不变 |
-| 编排 | LangGraph 状态图；自建对话状态表、事件队列和调用包装 | `SqliteSaver` 检查点、`interrupt` / `Command(resume)`、原生 `stream` 模式、回调生成轨迹 |
-| 模型 | 中转站 GPT 系列，Responses 接口，配置来自本目录 `.env` | 重试用 `.with_retry()`；版本同步待用户确认 |
+| 编排 | LangGraph 状态图；`SqliteSaver` 检查点按会话保存图状态；`interrupt` / `Command(resume)` 等待确认与审批；`graph.stream` 原生流式；回调处理器生成轨迹 | 只读查询环节改为 `create_agent` 子图（见工具调用） |
+| 模型 | 中转站 GPT 系列（默认 `gpt-6.2-sol`），Responses 接口，配置来自本目录 `.env`；连接失败与上游 5xx 用 `.with_retry()` 重试一次 | 不变 |
 | 业务存储 | SQLite | 不变 |
 | 政策检索 | SQLite FTS5（中文双字切分）+ 适用性过滤 + 版本冲突检测 | `Document` + 文本切分器、`FastEmbedEmbeddings`（bge-small-zh）+ `Chroma`、jieba `BM25Retriever`、`EnsembleRetriever`、`ParentDocumentRetriever`、索引 API、可选重排序 |
 | 工具调用 | 代码按意图固定选择只读工具 | `create_agent` 子图 + 调用上限中间件自主选择只读工具；只读工具同时以 MCP 服务提供 |
-| 可观测 | 自建运行轨迹 | 自建页面轨迹 + 本地 Arize Phoenix（OpenTelemetry + OpenInference 自动埋点） |
-| 页面 | FastAPI 提供静态 HTML/CSS/原生 JS 模块，无构建工程；流式事件 | 不变 |
-| 验证 | `tests/` 业务测试；`evals/replay.py` 场景回放 | pytest 统一入口；检索评测与 RAG 方案对比 |
+| 可观测 | `BaseCallbackHandler` 从节点、模型、工具回调生成页面轨迹 | 页面轨迹 + 本地 Arize Phoenix（OpenTelemetry + OpenInference 自动埋点） |
+| 页面 | FastAPI 提供静态 HTML/CSS/原生 JS 模块，无构建工程；SSE 流式事件 | 完善界面与排版设计，作为展示全部能力的主入口（见第 14 节） |
+| 验证 | pytest 业务测试（本地）；`evals/replay.py` 离线/真实模型场景回放（13 个场景） | 检索评测与 RAG 方案对比 |
 
 ## 4. 架构
 
@@ -42,32 +42,37 @@
 ```mermaid
 flowchart LR
     UI[三角色网页] -->|会话 Cookie + 标签页角色| API[FastAPI]
-    API --> WF[LangGraph 工作流]
-    WF -->|一次结构化调用| LLM[中转站 GPT]
+    API -->|graph.stream / Command resume| WF[LangGraph 工作流]
+    WF -->|结构化调用 + with_retry| LLM[中转站 GPT]
     WF --> RT[只读工具 / 政策检索]
     WF --> BS[业务服务与写操作校验]
     API --> BS
     RT --> DB[(SQLite 业务库 / 政策索引)]
     BS --> DB
-    WF --> TR[运行轨迹 / 流式事件]
-    TR --> UI
+    WF <-->|按会话 thread_id| CP[(SqliteSaver 检查点)]
+    WF -.回调.-> TR[轨迹处理器]
+    TR -->|SSE 轨迹与答复草稿| UI
 ```
+
+检查点表与业务表位于同一个本地 SQLite 文件。客服审批写入后，由 API 恢复正在等待这份审批的客户会话。
 
 ### 4.2 一轮消息怎样处理（当前）
 
-工作流节点：读取案件 → 检查明确指令 → 准备上下文 → 识别诉求 → 选择并执行只读查询 → 检查缺失信息 → 规则校验 → 保存方案或补问 → 返回结果。
+工作流节点：读取上下文 → 检查明确指令 → 准备上下文 → 识别诉求 → 选择并执行只读查询 → 检查缺失信息 → 规则校验 → 保存方案或补问 → 返回结果 → 判断是否等待（等待确认 / 等待审批 / 结束）。节点按职责放在 `workflow/nodes/` 下，明确指令与只读查询用映射表分派。
 
-1. 从服务端会话取得身份，读取当前案件与对话状态。
+1. 从服务端会话取得身份；从检查点读取会话图状态，若会话所在案件已被其他会话或业务操作更新（案件进度 revision 变化）则改用案件进度中的最新草稿。
 2. 页面按钮和明确指令（如“选择商品 ITEM-003”“确认换货”、带编号的确认/提交命令）直接路由，不调用模型。
 3. 其余消息由模型做一次结构化提取（`IntakeUpdate`）：意图、订单、商品、数量、原因、拆封情况等，只提取本轮新增或更正的信息。
 4. 代码按意图选择只读工具（订单、物流、库存、案件、申请、工单、政策检索），按归属校验返回数据。
 5. 缺信息时只补问必要字段，并在回复卡片中给出可点击的候选；补问次数有上限，超过后转人工。
 6. 规则服务根据订单事实和结构化政策计算资格、金额与审批要求，附上规则说明和所用条款；不再调用模型改写同一结论。
 7. 政策咨询走检索 → 适用性过滤 → 冲突检测 → 模型依据条款回答，引用必须来自本轮检索结果。
-8. 涉及写入时先展示方案，等待用户确认；需要审批时等待客服；退货等待寄回、签收、检验事件后执行模拟退款。
+8. 涉及写入时先展示方案：每轮结束前若有待确认的退货/换货方案，图在 `await_confirmation` 用 `interrupt` 暂停；当前申请待审批时在 `await_approval` 暂停。下一条消息或页面按钮以 `Command(resume=...)` 恢复，恢复值携带方案编号与版本，版本不一致且等待的版本仍有效时拒绝；客服审批写入后恢复客户会话。退货等待寄回、签收、检验事件后执行模拟退款。
 9. 每轮回复附带结构化卡片；读取会话时附上方案与记录的当前状态。
+10. 页面轨迹由回调处理器生成：节点、模型步骤（`model_step` 标签）、工具调用（`@tool` 与带 `tool_call` 标签的业务查询/写入）的开始与结束、耗时、token、参数摘要、政策引用、模型故障分类，以及暂停与恢复点；模型/工具调用次数和整轮时间在开始回调中检查，步骤数用 `recursion_limit`。
+11. 流式接口消费 `graph.stream`：`messages` 模式中只提取 `PolicyAnswer.text` 作为答复草稿，轨迹快照随流推送；接口在后台线程中跑完整轮，浏览器断开不中断已开始的写入。
 
-等待用户、等待审批、等待仓库事件和退款待核对都是持久化状态，请求结束即返回，不在后台循环调用模型。
+等待用户、等待审批、等待仓库事件和退款待核对都是持久化状态，请求结束即返回，不在后台循环调用模型。失败时会话检查点复位为一轮结束的状态；查询持续失败或预算耗尽转人工，写入结果未知时按原编号查询而不重复执行。
 
 ## 5. 关键设计取舍（当前）
 
@@ -77,7 +82,9 @@ flowchart LR
 | 方案与授权 | 方案带版本；确认和审批绑定方案版本并有有效期；方案变化即失效 | 防止旧确认授权新金额 |
 | 写操作 | 每个写操作有幂等键和操作记录；退款结果未知时只能核对原操作 | 避免重复退款和虚报成功 |
 | 卡片与历史 | 卡片是当时快照，读取时附当前状态；失效卡片不提供按钮，后端仍拒绝旧版本 | 历史可追溯，同时不误导操作 |
-| 模型故障 | 分为超时、连接失败、限流、上游错误、输出格式；超时 504、限流 429、其余 502；仅连接失败和 5xx 且未收到数据时重试一次 | 能从轨迹判断故障来源；超时重试会让等待翻倍 |
+| 模型故障 | 分为超时、连接失败、限流、上游错误、输出格式；超时 504、限流 429、其余 502；连接失败和上游 5xx 用 `.with_retry()` 重试一次 | 能从轨迹判断故障来源；超时重试会让等待翻倍 |
+| 会话状态与业务事务 | 会话图状态由检查点保存；案件草稿同时写入案件进度表，与确认、提交、换货等业务写入同一事务；读取时以案件进度 revision 判断检查点是否过期 | 保留事务内的版本与冲突校验；检查点在业务提交后单独写入，崩溃时有案件的会话从案件进度恢复，无案件会话最多丢失最后一轮补充信息 |
+| interrupt 与授权 | `interrupt` 只负责持久化等待点和恢复；确认、审批的有效性仍由业务服务在写入事务中校验；等待点丢失时下一轮结束会重新建立 | 等待点不是授权来源，不会因检查点异常而放行或卡死 |
 | 耗时 | 方案轮只调用一次模型；政策咨询两次 | 规则说明由代码给出；同一回放场景单次实测，方案轮从 28.2 秒降到 8.2 秒，token 减少约一半 |
 | 多角色演示 | 按角色分别保存会话，请求头只选择已有会话，权限仍按会话用户校验 | 同一浏览器可并行演示三方，且不放宽权限 |
 | 不可信文本 | 用户消息、检索正文和工具返回都作为数据处理，不作为指令 | 防止提示注入绕过确认与审批 |
@@ -86,31 +93,30 @@ flowchart LR
 
 项目尽量用 LangChain / LangGraph 的现成组件实现，原因有两个：一是这正是简历要展示的框架能力；二是这些组件都会触发 LangChain 回调，能被 OpenInference 自动埋点完整覆盖，无需手动埋点。只有订单、金额、审批、退款等业务规则和数据持久化保留为普通 Python 代码，它们作为图节点或工具运行，仍处在自动追踪的调用链中。
 
-| 现在的自建实现 | 目标组件 | 阶段 |
-| --- | --- | --- |
-| 自建对话状态表保存图进度 | `SqliteSaver` 检查点（每会话一个 `thread_id`） | 2 |
-| 确认、审批等待靠业务状态判断后结束请求 | `interrupt` 暂停 + `Command(resume=...)` 恢复 | 2 |
-| 自建事件队列与 `emit` 回调推送进度 | `graph.stream(stream_mode=["updates", "messages", "custom"])` + `get_stream_writer` | 2 |
-| `Run.call` 手动包装每个节点、模型和工具调用以记录轨迹 | 自定义 `BaseCallbackHandler` 从回调生成页面轨迹；预算用 `recursion_limit` | 2 |
-| 手写的连接失败重试循环 | `.with_retry(retry_if_exception_type=...)` | 2 |
-| 无外部追踪 | Phoenix + `LangChainInstrumentor` 自动埋点 | 3 |
-| 部分只读查询直接调用服务 | 全部改为 `@tool`，身份经运行配置注入 | 4 |
-| 按意图固定选择工具 | `create_agent` 子图 + `ToolCallLimitMiddleware` / `ModelCallLimitMiddleware` | 4 |
-| 无 | MCP Python SDK 服务 + `langchain-mcp-adapters` | 5 |
-| 自建 FTS5 索引与双字切分 | `Document`、`MarkdownHeaderTextSplitter`、`RecursiveCharacterTextSplitter`、jieba `BM25Retriever` | 8 |
-| 无向量检索 | `FastEmbedEmbeddings` + `Chroma` | 8 |
-| 手写内容哈希增量更新 | LangChain 索引 API（`index` + `SQLRecordManager`） | 8 |
-| 无 | `EnsembleRetriever`（RRF）、`ParentDocumentRetriever`、LCEL 并行多问法查询 | 8 |
-| 无 | `ContextualCompressionRetriever` + 本地交叉编码器 | 9 |
+| 原自建实现 | 框架组件 | 阶段 | 状态 |
+| --- | --- | --- | --- |
+| 自建对话状态表保存图进度 | `SqliteSaver` 检查点（每会话一个 `thread_id`） | 2 | 当前 |
+| 确认、审批等待靠业务状态判断后结束请求 | `interrupt` 暂停 + `Command(resume=...)` 恢复 | 2 | 当前 |
+| 自建事件队列与 `emit` 回调推送进度 | `graph.stream(stream_mode=["messages", "updates", "custom"])` | 2 | 当前 |
+| `Run.call` 手动包装每个节点、模型和工具调用以记录轨迹 | 自定义 `BaseCallbackHandler` 从回调生成页面轨迹；预算用 `recursion_limit` 与回调计数 | 2 | 当前 |
+| 手写的连接失败重试循环 | `.with_retry(retry_if_exception_type=...)` | 2 | 当前 |
+| 无外部追踪 | Phoenix + `LangChainInstrumentor` 自动埋点 | 3 | 目标 |
+| 部分只读查询直接调用服务 | 全部改为 `@tool`，身份经运行配置注入 | 4 | 目标 |
+| 按意图固定选择工具 | `create_agent` 子图 + `ToolCallLimitMiddleware` / `ModelCallLimitMiddleware` | 4 | 目标 |
+| 无 | MCP Python SDK 服务 + `langchain-mcp-adapters` | 5 | 目标 |
+| 自建 FTS5 索引与双字切分 | `Document`、`MarkdownHeaderTextSplitter`、`RecursiveCharacterTextSplitter`、jieba `BM25Retriever` | 8 | 目标 |
+| 无向量检索 | `FastEmbedEmbeddings` + `Chroma` | 8 | 目标 |
+| 手写内容哈希增量更新 | LangChain 索引 API（`index` + `SQLRecordManager`） | 8 | 目标 |
+| 无 | `EnsembleRetriever`（RRF）、`ParentDocumentRetriever`、LCEL 并行多问法查询 | 8 | 目标 |
+| 无 | `ContextualCompressionRetriever` + 本地交叉编码器 | 9 | 目标 |
+
+阶段 2 的两处实现取舍：轨迹事件由回调处理器记录、在消费流的循环中推送，而不是在节点内调用 `get_stream_writer`（节点开始回调时取不到 writer）；流式接口保留一个后台线程，只用于浏览器断开后让本轮跑完。
 
 保留为领域代码、但运行在图节点或 Runnable 中的部分：资格与金额计算、方案版本与授权、幂等写入与退款核对、政策适用性过滤与版本冲突检测、模型故障分类与中文提示。
 
-## 7. LangGraph 原生化与可观测性（目标，阶段 2—3）
+## 7. 可观测性（目标，阶段 3）
 
-- **检查点：** `SqliteSaver` 保存图状态，服务重启后按会话的 `thread_id` 继续；业务表仍是订单、方案、申请、退款的权威来源。
-- **人工介入：** 方案确认与客服审批节点调用 `interrupt` 暂停；页面按钮或客服操作以 `Command(resume=...)` 恢复，恢复值携带方案编号与版本，方案变化后旧的恢复指令被拒绝。
-- **流式输出：** 页面进度与答复草稿来自 LangGraph 原生 `stream` 模式和 `get_stream_writer`，不再维护自建事件队列。
-- **页面轨迹：** 由自定义回调处理器从节点、模型、工具的开始/结束事件生成，字段与现在一致（耗时、token、参数与结果摘要、政策引用、模型故障分类），继续做脱敏，供用户查看。
+- **页面轨迹（当前）：** 由回调处理器生成，脱敏后给用户查看，见第 4.2 节。
 - **Phoenix：** 本地运行 Arize Phoenix，通过 `phoenix.otel.register`（OpenTelemetry 导出）与 `LangChainInstrumentor`（OpenInference 自动埋点）记录完整调用链；由 `.env` 开关控制，默认关闭；可配置隐藏模型输入输出。Phoenix 面向开发调试与评测，页面轨迹面向用户，两者并存。发送协议为标准 OTLP，以后可改接其他兼容平台。
 
 ## 8. Agent 工具调用与 MCP（目标，阶段 4—5）
@@ -158,8 +164,8 @@ flowchart LR
 
 ## 10. 可观测与评测
 
-- **当前：** 每轮保存运行轨迹（节点、模型与工具调用、参数摘要、结果、政策引用、耗时、token、模型故障分类与首个数据耗时），网页右侧可查看；服务端日志记录模型故障与慢调用，不含密钥和用户原文。
-- **目标：** 页面轨迹改由回调生成；开发调试与评测使用本地 Phoenix；检索评测在开启 Phoenix 时同时记录为实验。
+- **当前：** 回调处理器每轮生成运行轨迹（节点、模型与工具调用、参数摘要、结果、政策引用、耗时、token、重试次数、模型故障分类与首个数据耗时、暂停与恢复点），网页右侧可查看；服务端日志记录模型故障与慢调用，不含密钥和用户原文。
+- **目标：** 开发调试与评测使用本地 Phoenix；检索评测在开启 Phoenix 时同时记录为实验。
 - **评测入口：** `evals/replay.py` 提供离线（固定模型提取结果）与真实模型两种场景回放，目标增加检索评测模式。离线结果不能代表真实模型的理解能力。
 
 ## 11. 演示业务规则
@@ -201,16 +207,30 @@ after-sales-agent/
 ├── src/after_sales/
 │   ├── api/          # 客户、客服、仓库、换货与页面接口
 │   ├── agent/        # 模型连接、诉求提取、政策解释、上下文组装
-│   ├── workflow/     # LangGraph 工作流、调用预算、模型调用与故障分类、轨迹
+│   ├── workflow/     # LangGraph 工作流
+│   │   ├── graph.py      # 建图、检查点、流式运行、等待点恢复与失败处理
+│   │   ├── nodes/        # 按职责划分的节点：路由与识别、只读查询、退货、换货/人工/政策、写操作、等待
+│   │   ├── state.py      # 图状态与每轮运行上下文
+│   │   ├── tracing.py    # 回调生成轨迹与调用预算
+│   │   ├── preview.py    # 从 messages 流提取答复草稿
+│   │   └── runtime.py    # 预算配置、错误类型、模型故障分类、轨迹摘要
 │   ├── domain/       # 规则、金额、方案、申请、审批、退款、换货、工单、消息卡片
 │   ├── tools/        # LangChain 只读工具
 │   ├── retrieval/    # 政策加载、索引、检索与适用性过滤
 │   └── storage/      # SQLite 表结构、种子数据与读写
 ├── web/              # 静态页面与原生 JS 模块
 ├── data/             # 本地业务库与政策索引（不提交）
-├── tests/            # 业务测试
+├── tests/            # 业务测试（本地，不提交）
 ├── evals/            # 场景回放入口与样例
 └── artifacts/        # 回放与评测的机器结果（不提交）
 ```
 
-目标阶段预计新增：工作流节点模块、轨迹回调处理器、Phoenix 开关与初始化、MCP 服务入口、政策长文档与常见问答数据、检索链模块、检索评测样例；向量库与索引记录存放在 `data/`（不提交）。按任务实际创建，不提前搭空模块。
+目标阶段预计新增：Phoenix 开关与初始化、MCP 服务入口、政策长文档与常见问答数据、检索链模块、检索评测样例；向量库与索引记录存放在 `data/`（不提交）。按任务实际创建，不提前搭空模块。
+
+## 14. 前端展示（目标）
+
+最终通过网页完整展示各项能力，而不只是作为调试入口。在功能阶段完成后统一完善界面与排版：
+- 建立统一的视觉规范（配色、字号、间距、组件样式），三个角色页面风格一致，适配常见桌面与窄屏宽度；
+- 客户对话页突出办理进度、方案卡片、政策引用与等待状态（等待确认、等待审批）；
+- 运行轨迹面板直观呈现 LangGraph 节点流、模型与工具调用、暂停与恢复点；后续阶段的 Agent 工具选择、MCP 调用、检索命中与得分、Phoenix 调用链入口也在界面中可见；
+- 提供面向演示的引导（示例诉求、角色切换、一键准备演示数据），便于按场景讲解。

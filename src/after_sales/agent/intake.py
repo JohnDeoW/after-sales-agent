@@ -6,9 +6,9 @@ from typing import Literal
 from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel, ConfigDict, Field
 
-from after_sales.agent.llm import create_model
+from after_sales.agent.llm import create_model, invoke_model
 from after_sales.config import Settings
-from after_sales.workflow.runtime import invoke_model, ModelCallFailed
+from after_sales.workflow.runtime import ModelCallFailed
 
 
 Intent = Literal["return", "order_query", "return_query", "exchange_query", "case_query", "ticket_query", "submit_return", "policy", "exchange", "logistics", "repair", "quality_dispute", "human", "confirm_return", "cancel_return", "unknown"]

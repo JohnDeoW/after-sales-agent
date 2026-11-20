@@ -12,3 +12,5 @@ data/*.sqlite3
 data/*.sqlite3-*
 artifacts/
 tests/
+DEVELOPMENT_PLAN.md
+PROJECT_RULES.md

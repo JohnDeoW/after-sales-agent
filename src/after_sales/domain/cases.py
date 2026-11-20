@@ -10,6 +10,7 @@ from after_sales.domain.return_requests import REQUEST_SELECT, request_view, req
 from after_sales.domain.returns import evaluate_return
 from after_sales.storage.database import connect_database, append_messages, read_order
 from after_sales.storage.tickets import ticket_summaries
+from after_sales.storage.case_progress import save_pointer
 
 
 def read_progress(connection, user_id: str, case_id: str) -> dict:
@@ -159,19 +160,8 @@ class CaseService:
             connection.execute("BEGIN IMMEDIATE")
             user = _session_user(connection, session_id)
             progress = read_progress(connection, user["id"], case_id)
-            state = progress["state"]
-            if progress["return_request"]:
-                state["return_request_id"] = progress["return_request"]["id"]
-            connection.execute(
-                """INSERT INTO conversation_states (session_id, case_id, state_json) VALUES (?, ?, ?)
-                   ON CONFLICT(session_id) DO UPDATE SET case_id = excluded.case_id, state_json = excluded.state_json""",
-                (session_id, case_id, json.dumps(state, ensure_ascii=False)),
-            )
-            connection.execute(
-                """UPDATE conversation_states SET history_start_id =
-                   (SELECT COALESCE(MAX(id), 0) + 1 FROM messages WHERE session_id = ?) WHERE session_id = ?""",
-                (session_id, session_id),
-            )
+            # 只切换会话指针；下一轮工作流发现案件变化后从案件进度读取草稿。
+            save_pointer(connection, session_id, case_id)
             # 给切换案件后的下一轮留下明确的会话边界，不重新执行图或业务写操作。
             append_messages(connection, session_id, f"恢复案件 {case_id}",
                             "已恢复。" + progress["summary"])

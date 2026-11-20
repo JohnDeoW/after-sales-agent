@@ -92,6 +92,12 @@ class CustomerService:
     def list_messages(self, session_id: str) -> list[dict]:
         return self.conversation(session_id)["messages"]
 
+    def sessions_for_case(self, case_id: str) -> list[str]:
+        """当前打开该案件的会话（内部使用，用于恢复等待审批的会话）。"""
+        with connect_database(self.db_path) as connection:
+            rows = connection.execute("SELECT session_id FROM conversation_states WHERE case_id = ?", (case_id,))
+            return [row["session_id"] for row in rows]
+
     def conversation(self, session_id: str) -> dict:
         """页面恢复用的会话快照；消息和当前案件来自同一次只读事务。"""
         with connect_database(self.db_path) as connection:

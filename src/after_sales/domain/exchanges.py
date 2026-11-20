@@ -8,7 +8,7 @@ from after_sales.domain.customer_service import _session_user
 from after_sales.domain.proposals import ProposalNotFound, ProposalConflict
 from after_sales.domain.intake_service import _result, _items_text, match_order_item
 from after_sales.storage.database import connect_database, read_order, append_messages
-from after_sales.storage.case_progress import save_state
+from after_sales.storage.case_progress import save_case_state, case_state
 from after_sales.storage.tickets import create_ticket
 
 
@@ -93,10 +93,11 @@ class ExchangeService:
                      proposal["quantity"], proposal["target_sku"], json.dumps({**d, "proposal_id": proposal_id, "version": version}, ensure_ascii=False)))
                 connection.execute("UPDATE exchange_proposals SET status = 'confirmed' WHERE id = ?", (proposal_id,))
                 result = read_exchange(connection, request_id, user["id"])
-            saved = connection.execute("SELECT * FROM conversation_states WHERE session_id = ?", (session_id,)).fetchone()
-            state = json.loads(saved["state_json"]) if saved else {"draft": {}}
-            state.update(exchange_request_id=result["id"], last_intent="exchange_query")
-            save_state(connection, session_id, saved["case_id"] if saved else None, state)
+            # 会话图状态由工作流节点更新；会话已关联案件时同步案件草稿。
+            case_id, state = case_state(connection, session_id)
+            if case_id is not None:
+                state.update(exchange_request_id=result["id"], last_intent="exchange_query")
+                save_case_state(connection, case_id, state)
             messages = append_messages(connection, session_id, content or f"确认换货 {proposal_id} v{version}", exchange_text(result),
                                        build_card({"exchange_request": result}))
             return {"status": result["status"], "exchange_request": result, "reused": reused, **messages}

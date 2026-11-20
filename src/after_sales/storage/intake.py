@@ -2,6 +2,7 @@
 
 import json
 import secrets
+from copy import deepcopy
 import hashlib
 from after_sales.domain.message_cards import build_card
 from pathlib import Path
@@ -14,14 +15,34 @@ from after_sales.storage.refunds import read_refund
 from after_sales.storage.tickets import create_ticket
 
 
-def load_context(path: Path, session_id: str) -> dict:
+DEFAULT_STATE = {"draft": {}, "last_intent": "unknown", "query_order_id": None}
+
+
+def load_context(path: Path, session_id: str, snapshot: dict | None = None) -> dict:
+    """读取本轮上下文。snapshot 是检查点中的会话图状态（conversation、case_id、case_revision）。
+
+    会话状态以检查点为准；会话所在案件被其他会话或业务操作更新过（revision 变化）或切换了案件时，
+    改用案件进度中的最新草稿。没有检查点的旧会话从原对话状态表迁移。
+    """
     with connect_database(path) as connection:
         connection.execute("BEGIN")
         user = _session_user(connection, session_id)
         row = connection.execute(
             "SELECT case_id, state_json, history_start_id FROM conversation_states WHERE session_id = ?", (session_id,),
         ).fetchone()
-        state = json.loads(row["state_json"]) if row else {"draft": {}, "last_intent": "unknown", "query_order_id": None}
+        case_id = row["case_id"] if row else None
+        case = connection.execute("SELECT state_json, revision FROM case_progress WHERE case_id = ?", (case_id,)).fetchone()
+        if snapshot and snapshot.get("conversation") is not None and snapshot.get("case_id") == case_id and (
+                case_id is None or (case and snapshot.get("case_revision") == case["revision"])):
+            state = deepcopy(snapshot["conversation"])
+        elif case:
+            state = json.loads(case["state_json"])
+        elif snapshot and snapshot.get("conversation") is not None and case_id is None:
+            state = deepcopy(snapshot["conversation"])
+        elif row and row["state_json"] not in (None, "", "{}"):
+            state = json.loads(row["state_json"])  # 检查点上线前保存的旧会话
+        else:
+            state = deepcopy(DEFAULT_STATE)
         history = connection.execute(
             "SELECT id, role, content FROM messages WHERE session_id = ? AND id >= ? ORDER BY id DESC LIMIT 6",
             (session_id, row["history_start_id"] if row else 0),
@@ -51,6 +72,8 @@ def load_context(path: Path, session_id: str) -> dict:
                      "confirmation": dict(confirmation) if confirmation else None,
                      "return_request": dict(request) if request else None}
             if request:
+                # 恢复案件后可以直接查询这份申请。
+                state.setdefault("return_request_id", request["id"])
                 refund = read_refund(connection, request["id"])
                 facts["return_request"]["refund_operation"] = ({key: refund[key] for key in ("id", "status", "amount_cents")} if refund else None)
         last_id = connection.execute("SELECT MAX(id) FROM messages WHERE session_id = ?", (session_id,)).fetchone()[0]

@@ -106,9 +106,10 @@ def stream_message(body: SendMessage, request: Request, service: Service, sessio
     queue = Queue()
 
     def execute():
+        # 在独立线程中消费 LangGraph 流：浏览器断开时这一轮仍会跑完，不会中断已开始的写入。
         try:
-            result = request.app.state.workflow.receive(session_id, body.content, emit=queue.put)
-            queue.put({"type": "result", "data": result})
+            for event in request.app.state.workflow.stream(session_id, body.content):
+                queue.put(event)
         except Exception as exc:
             # 项目自身的固定提示可以展示（如模型超时、预算停止）；未知异常文本可能含上游数据，只给通用提示。
             from after_sales.agent.intake import IntakeUnavailable

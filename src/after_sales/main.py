@@ -42,6 +42,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.workflow = AfterSalesWorkflow(app.state.customer_service, extractor,
                                            limits=limits, policy_explainer=explainer, policy_index_path=app.state.policy_index_path)
     yield
+    app.state.workflow.close()
 
 
 def create_app(db_path: Path = DEMO_DB_PATH, *, extractor=None, policy_explainer=None,

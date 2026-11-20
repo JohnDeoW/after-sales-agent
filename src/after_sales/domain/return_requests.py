@@ -8,7 +8,7 @@ from after_sales.domain.customer_service import CustomerService, _session_user
 from after_sales.domain.proposals import ProposalConflict, ProposalNotFound, sync_proposal, assessment_details
 from after_sales.domain.returns import evaluate_return, assessment_reply, assessment_status
 from after_sales.storage.database import connect_database, read_order, append_messages
-from after_sales.storage.case_progress import save_state, save_case_state
+from after_sales.storage.case_progress import save_state, save_case_state, case_state
 from after_sales.domain.authorizations import valid, invalidate
 from after_sales.storage.return_events import read_events, return_conditions_met
 from after_sales.storage.refunds import read_refund
@@ -191,9 +191,8 @@ class ReturnRequestService:
             ).fetchone()
             if proposal is None:
                 raise ProposalNotFound("未找到当前用户的确认记录，请先明确确认方案。")
-            context = connection.execute("SELECT * FROM conversation_states WHERE session_id = ?", (session_id,)).fetchone()
-            state = json.loads(context["state_json"]) if context else {}
-            if (context is None or context["case_id"] != proposal["case_id"]
+            case_id, state = case_state(connection, session_id)
+            if (case_id != proposal["case_id"]
                     or state.get("proposal_id") != proposal["id"] or proposal["status"] != "confirmed"):
                 raise ProposalConflict("原确认已失效或不属于当前会话，请查看并确认最新方案后提交。")
 

@@ -11,6 +11,7 @@ const labels = {
   persist_turn: "保存本轮结果", confirm: "核对方案确认", cancel: "取消办理",
   create_request: "创建申请", policy_consultation: "检索适用政策", exchange: "检查换货条件",
   confirm_exchange: "确认换货", service_handoff: "交接人工", reply: "返回已保存结果",
+  wait: "检查是否需要等待", await_confirmation: "等待方案确认", await_approval: "等待客服审批", finish: "本轮结束",
   // 业务工具
   get_order: "查询订单", list_orders: "列出本人订单", search_policy: "检索政策条款", get_logistics: "查询物流",
   get_inventory: "查询库存", get_case: "查询案件", list_cases: "列出案件", get_ticket: "查询工单", list_tickets: "列出工单",
@@ -19,7 +20,7 @@ const labels = {
   confirm_proposal: "记录方案确认", cancel_proposal: "撤回方案",
 };
 const kinds = { node: ["流程节点", "◇"], model: ["模型调用", "✦"], tool: ["业务工具", "⚙"] };
-const eventStatus = { running: "进行中", ok: "完成", error: "失败" };
+const eventStatus = { running: "进行中", ok: "完成", error: "失败", interrupted: "已暂停等待", stopped: "已停止" };
 const fields = { order_id: "订单", item: "商品项", quantity: "数量", reason: "原因", opened: "拆封情况", target_specification: "目标规格" };
 const argNames = { order_id: "订单", item_id: "商品项", request_id: "申请", case_id: "案件", ticket_id: "工单", proposal_id: "方案",
   confirmation_id: "确认记录", version: "版本", sku: "SKU", ordered_on: "下单日期", reason_kind: "原因类型" };
@@ -29,7 +30,7 @@ const intents = { return: "退货", order_query: "订单查询", return_query: "
 const results = { clarification_needed: "需要澄清", order_found: "已找到订单", order_not_found: "未找到订单", logistics_found: "已找到物流",
   ticket_found: "已找到工单", case_found: "已找到案件", return_request_found: "已找到申请", exchange_request_found: "已找到换货申请",
   workflow_handoff: "已转人工", policy_answered: "已答复政策", policy_handoff: "政策待人工", ready_for_evaluation: "信息已齐",
-  needs_policy: "缺少政策依据", stopped: "已停止", error: "失败", ok: "完成" };
+  needs_policy: "缺少政策依据", stopped: "已停止", error: "失败", ok: "完成", resumed: "已恢复等待点" };
 const runWaiting = { awaiting_confirmation: "方案已生成，等待你核对并确认。", awaiting_approval: "等待客服审批当前方案。",
   workflow_handoff: "自动办理已停止，已有信息已交给人工。", policy_handoff: "政策依据不足或有冲突，等待人工核对。",
   error: "本轮处理失败，请核对记录后重试。", stopped: "本轮已按预算停止，未完成办理。" };

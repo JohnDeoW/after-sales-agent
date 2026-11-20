@@ -42,13 +42,16 @@ def backfill_progress(connection) -> None:
         )
 
 
-def save_state(connection, session_id, case_id, state, missing_fields=None) -> None:
-    payload = json.dumps(state, ensure_ascii=False)
+def save_pointer(connection, session_id, case_id) -> None:
+    """记录会话当前办理的案件；切换案件时从下一条消息开始新的对话历史窗口。
+
+    会话的图状态由 LangGraph 检查点保存，这里只保留会话到案件的指针。
+    """
     previous = connection.execute("SELECT case_id FROM conversation_states WHERE session_id = ?", (session_id,)).fetchone()
     connection.execute(
-        """INSERT INTO conversation_states (session_id, case_id, state_json) VALUES (?, ?, ?)
-           ON CONFLICT(session_id) DO UPDATE SET case_id = excluded.case_id, state_json = excluded.state_json""",
-        (session_id, case_id, payload),
+        """INSERT INTO conversation_states (session_id, case_id, state_json) VALUES (?, ?, '{}')
+           ON CONFLICT(session_id) DO UPDATE SET case_id = excluded.case_id, state_json = '{}'""",
+        (session_id, case_id),
     )
     if case_id is not None and (previous is None or previous["case_id"] != case_id):
         connection.execute(
@@ -56,12 +59,28 @@ def save_state(connection, session_id, case_id, state, missing_fields=None) -> N
                (SELECT COALESCE(MAX(id), 0) + 1 FROM messages WHERE session_id = ?) WHERE session_id = ?""",
             (session_id, session_id),
         )
-    if case_id is None:
-        return
-    save_case_state(connection, case_id, state, missing_fields)
+
+
+def save_state(connection, session_id, case_id, state, missing_fields=None) -> None:
+    """更新会话指针；有案件时把草稿写入案件进度（与业务写入同一事务，revision 加一）。"""
+    save_pointer(connection, session_id, case_id)
+    if case_id is not None:
+        save_case_state(connection, case_id, state, missing_fields)
+
+
+def case_state(connection, session_id) -> tuple[str | None, dict]:
+    """在业务事务内读取会话当前案件及其草稿；没有案件时草稿为空。"""
+    row = connection.execute(
+        """SELECT s.case_id, p.state_json FROM conversation_states s
+           LEFT JOIN case_progress p ON p.case_id = s.case_id WHERE s.session_id = ?""", (session_id,),
+    ).fetchone()
+    if row is None or row["case_id"] is None:
+        return None, {}
+    return row["case_id"], json.loads(row["state_json"]) if row["state_json"] else {"draft": {}}
 
 
 def save_case_state(connection, case_id, state, missing_fields=None):
+    # 多个会话打开同一案件时都以这里的最新草稿为准；旧的在途识别由 revision 拒绝。
     payload = json.dumps(state, ensure_ascii=False)
     connection.execute(
         """INSERT INTO case_progress (case_id, state_json, missing_fields_json) VALUES (?, ?, COALESCE(?, '[]'))
@@ -70,5 +89,3 @@ def save_case_state(connection, case_id, state, missing_fields=None):
         (case_id, payload, json.dumps(missing_fields) if missing_fields is not None else None,
          json.dumps(missing_fields) if missing_fields is not None else None),
     )
-    # 多个会话打开同一案件时，都读取同一份最新草稿；旧的在途识别由 revision 拒绝。
-    connection.execute("UPDATE conversation_states SET state_json = ? WHERE case_id = ?", (payload, case_id))

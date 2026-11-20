@@ -25,7 +25,7 @@ class ConfigurationError(ValueError):
 class Settings:
     llm_api_key: str = field(repr=False)
     llm_base_url: str = "https://rightapi.ai/v1"
-    llm_model_id: str = "gpt-6.1-sol"
+    llm_model_id: str = "gpt-6.2-sol"
     llm_timeout_seconds: int = 120
     confirmation_ttl_seconds: int = 86400
     approval_ttl_seconds: int = 604800
@@ -52,7 +52,7 @@ def load_settings() -> Settings:
     return Settings(
         llm_api_key=api_key,
         llm_base_url=(values.get("LLM_BASE_URL") or "https://rightapi.ai/v1").strip(),
-        llm_model_id=(values.get("LLM_MODEL_ID") or "gpt-6.1-sol").strip(),
+        llm_model_id=(values.get("LLM_MODEL_ID") or "gpt-6.2-sol").strip(),
         llm_timeout_seconds=duration("LLM_TIMEOUT_SECONDS", 120),
         confirmation_ttl_seconds=duration("CONFIRMATION_TTL_SECONDS", 86400),
         approval_ttl_seconds=duration("APPROVAL_TTL_SECONDS", 604800),

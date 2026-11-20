@@ -2,7 +2,7 @@
 
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, Request, Response
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from after_sales.api.customer import Service, Session, set_session_cookie
@@ -105,8 +105,12 @@ def approval_details(request_id: str, service: Service, session_id: Session) -> 
 
 
 @router.post("/support/approvals/{request_id}")
-def decide_approval(request_id: str, body: ApprovalDecision, service: Service, session_id: Session) -> dict:
-    return ApprovalService(service).decide(session_id, request_id, **body.model_dump())
+def decide_approval(request_id: str, body: ApprovalDecision, request: Request, service: Service, session_id: Session) -> dict:
+    result = ApprovalService(service).decide(session_id, request_id, **body.model_dump())
+    # 审批结论已在业务事务中保存，再恢复正在等待这份审批的客户会话（interrupt）。
+    if result.get("approval") and not result.get("reused"):
+        request.app.state.workflow.resume_approval(request_id, body.decision)
+    return result
 
 
 @router.post("/demo/refund-operations/{operation_id}/result")

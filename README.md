@@ -27,11 +27,11 @@ uv sync --locked
 ```dotenv
 LLM_API_KEY=填写本项目的中转站密钥
 LLM_BASE_URL=https://rightapi.ai/v1
-LLM_MODEL_ID=gpt-6.1-sol
+LLM_MODEL_ID=gpt-6.2-sol
 LLM_TIMEOUT_SECONDS=120
 ```
 
-`.env` 不提交到版本库。应用固定从本项目根目录读取它，显式传入模型 SDK，当前使用 Responses 接口。修改后重启服务。根目录约定的默认模型已改为 `gpt-6.2-sol`，本项目暂时仍使用 `gpt-6.1-sol`，同步前需用户确认。
+`.env` 不提交到版本库。应用固定从本项目根目录读取它，显式传入模型 SDK，当前使用 Responses 接口。修改后重启服务。默认模型为 `gpt-6.2-sol`，与根目录约定一致。
 
 关于等待时间：
 
