@@ -3,7 +3,7 @@
 from langchain_core.runnables import Runnable, RunnableLambda
 from langgraph.runtime import Runtime
 
-from after_sales.tools.orders import create_get_order_tool
+from after_sales.tools.orders import get_order as get_order_tool
 from after_sales.workflow.runtime import ReadQueryUnavailable, WriteOutcomeUnknown
 from after_sales.workflow.state import TurnContext
 from after_sales.workflow.tracing import MODEL_TAG, TOOL_TAG
@@ -12,7 +12,7 @@ TRANSIENT = (TimeoutError, ConnectionError)
 
 
 def as_tool(name: str, function) -> Runnable:
-    """把业务服务调用包装为带 tool_call 标签的 Runnable；轨迹按工具调用记录。"""
+    """把写操作包装为带 tool_call 标签的 Runnable；轨迹按工具调用记录，但不作为模型可调用的工具。"""
     return RunnableLambda(lambda args: function(), name=name).with_config(tags=[TOOL_TAG])
 
 
@@ -23,10 +23,6 @@ def read(name: str, runnable: Runnable, args: dict | None = None):
                                    wait_exponential_jitter=False).invoke(args or {})
     except TRANSIENT:
         raise ReadQueryUnavailable("只读查询重试后仍暂不可用，自动办理已停止。") from None
-
-
-def read_service(name: str, function, args: dict | None = None):
-    return read(name, as_tool(name, function), args)
 
 
 def write(name: str, function, args: dict | None = None):
@@ -43,5 +39,4 @@ def model_step(name: str, function):
 
 
 def get_order(runtime: Runtime[TurnContext], order_id: str) -> dict:
-    ctx = runtime.context
-    return read("get_order", create_get_order_tool(ctx.deps.customers, ctx.session_id), {"order_id": order_id})
+    return read("get_order", get_order_tool, {"order_id": order_id})

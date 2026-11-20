@@ -1,9 +1,10 @@
-"""订单工具的身份由后端绑定，不允许模型提供 user_id 或 session_id。"""
+"""订单只读工具；身份来自运行配置中的服务端会话，模型不能提供 user_id 或 session_id。"""
 
-from langchain_core.tools import BaseTool, tool
+from langchain_core.runnables import RunnableConfig
+from langchain_core.tools import tool
 from pydantic import BaseModel, ConfigDict, Field
 
-from after_sales.domain.customer_service import CustomerService
+from after_sales.tools.scope import scope
 
 
 class OrderQuery(BaseModel):
@@ -11,10 +12,19 @@ class OrderQuery(BaseModel):
     order_id: str = Field(min_length=1, description="需要查询的订单编号")
 
 
-def create_get_order_tool(service: CustomerService, session_id: str) -> BaseTool:
-    @tool("get_order", args_schema=OrderQuery)
-    def get_order(order_id: str) -> dict:
-        """查询当前客户的订单和商品项；未找到时请用户核对订单号。"""
-        return service.get_order(session_id, order_id)
+class NoArguments(BaseModel):
+    model_config = ConfigDict(extra="forbid")
 
-    return get_order
+
+@tool("get_order", args_schema=OrderQuery)
+def get_order(order_id: str, config: RunnableConfig) -> dict:
+    """查询当前客户的订单和商品项；未找到时请用户核对订单号。"""
+    customers, session_id = scope(config)
+    return customers.get_order(session_id, order_id)
+
+
+@tool("list_orders", args_schema=NoArguments)
+def list_orders(config: RunnableConfig) -> list[dict]:
+    """列出当前客户的订单编号、状态与商品摘要，用于让用户选择订单。"""
+    customers, session_id = scope(config)
+    return customers.list_orders(session_id)

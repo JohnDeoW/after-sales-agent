@@ -29,6 +29,7 @@ from after_sales.storage.database import connect_database
 from after_sales.storage.intake import load_context, save_turn
 from after_sales.storage.workflow import save_trace
 from after_sales.tools.policies import create_search_policy_tool
+from after_sales.tools.scope import tool_config
 from after_sales.workflow.nodes import actions, reads, returns, routing, services, waits
 from after_sales.workflow.preview import DraftPreview
 from after_sales.workflow.runtime import Limits, ReadQueryUnavailable, WorkflowStopped, WriteOutcomeUnknown
@@ -99,10 +100,11 @@ class AfterSalesWorkflow:
     def close(self) -> None:
         self.checkpointer.conn.close()
 
-    @staticmethod
-    def config(session_id: str, trace: TraceHandler | None = None, limits: Limits | None = None) -> dict:
+    def config(self, session_id: str, trace: TraceHandler | None = None, limits: Limits | None = None) -> dict:
         config = {"configurable": {"thread_id": session_id}}
         if trace is not None:
+            # 只读工具从运行配置读取会话身份（见 tools/scope.py），模型无法通过参数指定其他用户。
+            config["configurable"].update(tool_config(self.customers, session_id)["configurable"])
             config.update(callbacks=[trace], recursion_limit=limits.max_steps)
         return config
 
