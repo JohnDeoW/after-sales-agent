@@ -25,7 +25,7 @@ from after_sales.domain.intake_service import ReturnIntake, _result
 from after_sales.domain.proposals import ProposalService
 from after_sales.domain.return_requests import ReturnRequestService
 from after_sales.domain.tickets import TicketService
-from after_sales.retrieval.index import INDEX_PATH
+from after_sales.retrieval.index import INDEX_PATH, release_vector_stores
 from after_sales.storage.database import connect_database
 from after_sales.storage.intake import load_context, save_turn
 from after_sales.storage.workflow import save_trace
@@ -102,6 +102,7 @@ class AfterSalesWorkflow:
 
     def close(self) -> None:
         self.checkpointer.conn.close()
+        release_vector_stores()
 
     def config(self, session_id: str, trace: TraceHandler | None = None, limits: Limits | None = None) -> dict:
         config = {"configurable": {"thread_id": session_id}}

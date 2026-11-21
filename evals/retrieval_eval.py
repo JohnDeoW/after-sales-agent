@@ -2,7 +2,8 @@
 
 - 指标：Recall@3、Recall@5、MRR（只统计应有答案的样例）、无依据判定准确率（应答“无依据”的样例）、
   有依据样例被误判为无依据的比例、检索耗时；并按诉求、退货原因、商品品类、检索难点分组。
-- 输入：用户原话（question）或模型改写问法（rewritten，由识别模型生成后存入评测集），可分别或同时运行。
+- 输入：用户原话（original）、模型改写问法（rewritten，由识别模型生成后存入评测集），或两者并行检索后合并
+  （combined，与线上政策咨询一致）；检索方式可选 hybrid（BM25 + 向量）、bm25、vector，用于对比。
 - 期望条款写作 clause_id，或 clause_id@version（需核对版本时）。
 - 开启 Phoenix 时同时把评测集与结果记录为 Phoenix 实验。
 """
@@ -28,10 +29,15 @@ def matches(expected: str, policy: dict) -> bool:
     return policy["chunk_id"] == expected if "@" in expected else policy["clause_id"] == expected
 
 
-def retrieve(case: dict, query_field: str, index_path: Path) -> dict:
-    query = case[query_field] or case["question"]
+QUERY_FIELDS = ("original", "rewritten", "combined")
+
+
+def retrieve(case: dict, query_field: str, index_path: Path, mode: str = "hybrid") -> dict:
+    rewritten = case["rewritten"] or case["question"]
+    query, message = {"original": (case["question"], None), "rewritten": (rewritten, None),
+                      "combined": (rewritten, case["question"])}[query_field]
     started = perf_counter()
-    result = search_policy(query, index_path=index_path, **case["context"])
+    result = search_policy(query, user_message=message, index_path=index_path, mode=mode, **case["context"])
     elapsed = (perf_counter() - started) * 1000
     return {"query": query, "status": result["status"], "missing_fields": result["missing_fields"],
             "ranked": [p["chunk_id"] for p in result["policies"]], "policies": result["policies"], "latency_ms": round(elapsed, 2)}
@@ -76,27 +82,27 @@ def grouped(rows: list[dict]) -> dict:
     return groups
 
 
-def evaluate(query_field: str, index_path: Path, cases: list[dict]) -> dict:
+def evaluate(query_field: str, index_path: Path, cases: list[dict], mode: str = "hybrid") -> dict:
     rows = []
     for case in cases:
-        retrieved = retrieve(case, query_field, index_path)
+        retrieved = retrieve(case, query_field, index_path, mode)
         rows.append({"id": case["id"], "query": retrieved["query"], "answerable": case["answerable"],
                      "expected": case["expected"], "tags": case["tags"], "note": case["note"],
                      "status": retrieved["status"], "missing_fields": retrieved["missing_fields"],
                      "ranked": retrieved["ranked"], "latency_ms": retrieved["latency_ms"], **score(case, retrieved)})
-    return {"query_field": query_field, "summary": aggregate(rows), "groups": grouped(rows), "rows": rows}
+    return {"query_field": query_field, "retriever": mode, "summary": aggregate(rows), "groups": grouped(rows), "rows": rows}
 
 
 def write_results(directory: Path, reports: list[dict], meta: dict) -> None:
     (directory / "results.json").write_text(json.dumps({**meta, "reports": reports}, ensure_ascii=False, indent=2), encoding="utf-8")
-    fields = ["query_field", "id", "query", "answerable", "status", "expected", "ranked", "recall@3", "recall@5", "mrr",
+    fields = ["retriever", "query_field", "id", "query", "answerable", "status", "expected", "ranked", "recall@3", "recall@5", "mrr",
               "first_hit_rank", "false_no_answer", "no_answer_correct", "latency_ms"]
     with (directory / "results.csv").open("w", encoding="utf-8-sig", newline="") as stream:
         writer = csv.DictWriter(stream, fieldnames=fields, extrasaction="ignore")
         writer.writeheader()
         for report in reports:
             for row in report["rows"]:
-                writer.writerow({**row, "query_field": report["query_field"], "expected": "|".join(row["expected"]),
+                writer.writerow({**row, "retriever": report["retriever"], "query_field": report["query_field"], "expected": "|".join(row["expected"]),
                                  "ranked": "|".join(row["ranked"])})
 
 
@@ -137,8 +143,8 @@ def log_phoenix_experiment(settings, reports: list[dict], cases: list[dict], ind
         metadata=[{"tags": c["tags"], "note": c["note"]} for c in cases])
     by_id = {c["id"]: c for c in cases}
     for report in reports:
-        def task(input, field=report["query_field"]):
-            return retrieve(by_id[input["id"]], field, index_path) | {"policies": None}
+        def task(input, field=report["query_field"], mode=report["retriever"]):
+            return retrieve(by_id[input["id"]], field, index_path, mode) | {"policies": None}
 
         def evaluator(input, output):
             # 有依据的问题记 Recall@3，应答无依据的问题记判定是否正确。
@@ -147,5 +153,5 @@ def log_phoenix_experiment(settings, reports: list[dict], cases: list[dict], ind
             result = score(case, {**output, "policies": ranked})
             return result["recall@3"] if case["answerable"] else float(result["no_answer_correct"])
         run_experiment(dataset=dataset, task=task, evaluators={"recall@3_or_no_answer": evaluator},
-                       experiment_name=f"fts5-baseline-{report['query_field']}", client=client, print_summary=False)
+                       experiment_name=f"{report['retriever']}-{report['query_field']}", client=client, print_summary=False)
     return f"{base_url}/datasets"

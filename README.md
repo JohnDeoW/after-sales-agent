@@ -56,7 +56,7 @@ uv run after-sales-policy-index rebuild
 ```
 
 - 第一条命令创建 `data/demo.sqlite3`，按香港时区当天生成订单日期；文件已存在时保留全部记录，不重置日期、退款或库存。
-- 第二条命令从政策源文件重建 `data/policy_index.sqlite3`，不调用模型，也不清空业务数据库。
+- 第二条命令从政策条款、长文档与常见问答重建政策索引：完整条款快照写入 `data/policy_index.sqlite3`，检索用的小块用本地向量模型 `BAAI/bge-small-zh-v1.5` 向量化后写入 `data/policy_index-vectors/`（Chroma）。不调用中转站，也不清空业务数据库。模型缓存在 `data/models/`，首次使用时自动下载（约 90 MB）。重建是增量的：内容未变的小块直接跳过，删除的条款从索引移除，输出中可看到新增、跳过、删除的数量。
 - 服务首次启动会为业务库补充会话、物流、库存等表及场景。
 
 若要从全新状态练习，加 `--reset` 重置默认库：删除 `data/demo.sqlite3` 后按当天日期重建，清空其中全部案件、退款、会话和库存预留，其他库文件不受影响。重置前先停止正在使用该库的服务，完成后直接启动即可。
@@ -135,8 +135,11 @@ uv run python -X utf8 evals/replay.py --mode live --select holdout
 **检索评测**（同一入口，不调用模型、不需要密钥）：用 `evals/retrieval_cases.json` 中的 80 道虚构问题评测政策检索，结果写入 `artifacts/retrieval-…/results.json` 与 `results.csv`。
 
 ```powershell
-# 用户原话与模型改写问法两种输入各跑一遍
-uv run python -X utf8 evals/replay.py --mode retrieval --query both
+# 混合检索，三种输入各跑一遍
+uv run python -X utf8 evals/replay.py --mode retrieval
+
+# 对比 BM25、向量与混合检索
+uv run python -X utf8 evals/replay.py --mode retrieval --retriever all --query combined
 
 # 只跑用户原话
 uv run python -X utf8 evals/replay.py --mode retrieval --query original
@@ -144,6 +147,8 @@ uv run python -X utf8 evals/replay.py --mode retrieval --query original
 # 用真实识别模型重新生成改写问法并写回评测集（约 80 次模型调用，会产生 API 消耗）
 uv run python -X utf8 evals/replay.py --mode retrieval --refresh-rewrites
 ```
+
+`--retriever` 可选 `hybrid`（默认，BM25 + 本地向量混合）、`bm25`、`vector` 或 `all`，`--query` 可选 `original`（用户原话）、`rewritten`（模型改写问法）、`combined`（两者并行检索后合并，与线上一致）或 `all`，用于对比不同方案。检索评测使用本地向量模型，不调用中转站。
 
 输出 Recall@3、Recall@5、MRR（只统计有依据的问题）、无依据判定准确率、有依据问题被误判为无依据的比例和检索耗时，并按诉求、退货原因、商品品类、检索难点分组。每道题都标注了期望条款（需要核对版本时写为“编号@版本”）和考察的检索难点。`.env` 开启 Phoenix 且本地 Phoenix 运行时，评测集与结果同时记录为 Phoenix 的数据集和实验。
 
@@ -220,6 +225,7 @@ MCP_SERVER_URL=http://127.0.0.1:8000/mcp/
 | 提示未配置 `LLM_API_KEY` | 检查本项目 `.env`，不要把文件放到父目录；配置后重启 |
 | 提示“无法连接只读工具 MCP 服务”（HTTP 503） | 检查 `.env` 的 `MCP_SERVER_URL` 与网页服务端口一致（默认 `http://127.0.0.1:8000/mcp/`），或单独启动的 MCP 服务仍在运行；不使用 MCP 时删除该配置并重启 |
 | 开启 Phoenix 后启动报错“未安装可观测性依赖” | 运行 `uv sync --extra observability` 后重启；不需要追踪时把 `PHOENIX_ENABLED` 改回 `false` |
+| 重建政策索引时下载模型失败或很慢 | 向量模型首次使用需要从 Hugging Face 下载到 `data/models/`；可设置代理或 `HF_ENDPOINT` 镜像后重试，下载一次后离线可用 |
 | 提示数据库或政策索引不存在 | 执行初始化、索引重建；自定义库则核对启动命令里的数据库路径 |
 | 端口被占用 | 在原服务终端停止服务，或选其他端口；不要同时向同一端口启动两个服务 |
 | 提示“模型响应超时”（HTTP 504） | 模型在 `LLM_TIMEOUT_SECONDS` 内没有返回结果，多为模型或中转站响应慢。本轮消息未保存、已有信息保留，输入框保留原文，稍后重发即可。经常出现时可适当调大该配置并重启 |

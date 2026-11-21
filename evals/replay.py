@@ -139,8 +139,10 @@ def main():
     parser.add_argument("--mode", choices=["offline", "live", "retrieval"], default="offline")
     parser.add_argument("--select", default="core", help="core / all / 组名 / 场景ID，多个值用逗号分隔；holdout为独立检查组")
     parser.add_argument("--list", action="store_true")
-    parser.add_argument("--query", choices=["original", "rewritten", "both"], default="both",
-                        help="检索评测的输入：用户原话、模型改写问法或两者都跑")
+    parser.add_argument("--query", choices=["original", "rewritten", "combined", "all"], default="all",
+                        help="检索评测的输入：用户原话、模型改写问法、两者并行合并（线上方式）或全部")
+    parser.add_argument("--retriever", choices=["hybrid", "bm25", "vector", "all"], default="hybrid",
+                        help="检索评测的检索方式：BM25 + 向量混合、仅 BM25、仅向量或全部")
     parser.add_argument("--refresh-rewrites", action="store_true",
                         help="检索评测前用真实识别模型重新生成改写问法并写回评测集（会产生模型调用）")
     args = parser.parse_args()
@@ -182,21 +184,26 @@ def run_retrieval(args) -> int:
     directory.mkdir(parents=True)
     index = directory / "policies.sqlite3"
     rebuild_index(index_path=index)
-    fields = {"original": ["question"], "rewritten": ["rewritten"], "both": ["question", "rewritten"]}[args.query]
-    if "rewritten" in fields and not all(case["rewritten"] for case in data["cases"]):
+    from after_sales.retrieval.index import EMBEDDING_MODEL, release_vector_stores
+    from retrieval_eval import QUERY_FIELDS
+    fields = QUERY_FIELDS if args.query == "all" else [args.query]
+    modes = ["bm25", "vector", "hybrid"] if args.retriever == "all" else [args.retriever]
+    if any(f != "original" for f in fields) and not all(case["rewritten"] for case in data["cases"]):
         raise SystemExit("评测集尚无改写问法，请先加 --refresh-rewrites 生成。")
-    reports = [evaluate(field, index, data["cases"]) for field in fields]
-    meta = {"mode": "retrieval", "retriever": "sqlite-fts5-bigram + 适用性过滤", "cases": len(data["cases"]),
+    reports = [evaluate(field, index, data["cases"], mode) for mode in modes for field in fields]
+    meta = {"mode": "retrieval", "retriever": "jieba BM25 + 本地向量（RRF）父子检索 + 适用性过滤",
+            "embedding_model": EMBEDDING_MODEL, "cases": len(data["cases"]),
             "rewritten_by": data.get("rewritten_by"), "business_date": str(business_today())}
     write_results(directory, reports, meta)
     for report in reports:
-        print(json.dumps({"query": report["query_field"], **report["summary"]}, ensure_ascii=False), flush=True)
+        print(json.dumps({"retriever": report["retriever"], "query": report["query_field"], **report["summary"]}, ensure_ascii=False), flush=True)
     try:
         settings = load_settings()
     except Exception:
         settings = None
     if settings and settings.phoenix_enabled:
         print("Phoenix 实验：", log_phoenix_experiment(settings, reports, data["cases"], index))
+    release_vector_stores()
     print("机器结果：", directory)
     return 0
 

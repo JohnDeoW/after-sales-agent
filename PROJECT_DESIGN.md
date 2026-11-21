@@ -29,7 +29,7 @@
 | 编排 | LangGraph 状态图；`SqliteSaver` 检查点按会话保存图状态；`interrupt` / `Command(resume)` 等待确认与审批；`graph.stream` 原生流式；回调处理器生成轨迹 | 只读查询环节改为 `create_agent` 子图（见工具调用） |
 | 模型 | 中转站 GPT 系列（默认 `gpt-6.2-sol`），Responses 接口，配置来自本目录 `.env`；连接失败与上游 5xx 用 `.with_retry()` 重试一次 | 不变 |
 | 业务存储 | SQLite | 不变 |
-| 政策检索 | SQLite FTS5（中文双字切分）+ 适用性过滤 + 版本冲突检测 | `Document` + 文本切分器、`FastEmbedEmbeddings`（bge-small-zh）+ `Chroma`、jieba `BM25Retriever`、`EnsembleRetriever`、`ParentDocumentRetriever`、索引 API、可选重排序 |
+| 政策检索 | `Document` + 文本切分器；`FastEmbedEmbeddings`（本地 bge-small-zh）+ `Chroma`；jieba `BM25Retriever`；父子检索（`ParentDocumentRetriever`）；`EnsembleRetriever`（RRF）；LCEL 并行多问法；适用性过滤与版本冲突检测为链中步骤；索引 API 增量更新 | 评测驱动的重排序、无依据阈值与改写重查 |
 | 工具调用 | 12 个只读查询均为 LangChain `@tool`（白名单 `tools/registry.py`），会话身份经运行配置注入；自然语言查询由 `create_agent` 子图在白名单内自主选择工具，`ModelCallLimitMiddleware` / `ToolCallLimitMiddleware` 限制调用次数；只读工具同时以 MCP 服务提供（stdio / Streamable HTTP），配置 `MCP_SERVER_URL` 后 Agent 经 `MultiServerMCPClient` 调用 | 不变 |
 | 可观测 | `BaseCallbackHandler` 生成页面轨迹；可选本地 Arize Phoenix（`phoenix.otel.register` + `LangChainInstrumentor` 自动埋点，`.env` 开关，默认关闭） | 不变 |
 | 页面 | FastAPI 提供静态 HTML/CSS/原生 JS 模块，无构建工程；SSE 流式事件 | 完善界面与排版设计，作为展示全部能力的主入口（见第 14 节） |
@@ -105,10 +105,10 @@ flowchart LR
 | 部分只读查询直接调用服务 | 全部改为 `@tool`，身份经运行配置注入 | 4 | 当前 |
 | 按意图固定选择工具 | `create_agent` 子图 + `ToolCallLimitMiddleware` / `ModelCallLimitMiddleware` | 4 | 当前 |
 | 无 | MCP Python SDK 服务 + `langchain-mcp-adapters` | 5 | 当前 |
-| 自建 FTS5 索引与双字切分 | `Document`、`MarkdownHeaderTextSplitter`、`RecursiveCharacterTextSplitter`、jieba `BM25Retriever` | 8 | 目标 |
-| 无向量检索 | `FastEmbedEmbeddings` + `Chroma` | 8 | 目标 |
-| 手写内容哈希增量更新 | LangChain 索引 API（`index` + `SQLRecordManager`） | 8 | 目标 |
-| 无 | `EnsembleRetriever`（RRF）、`ParentDocumentRetriever`、LCEL 并行多问法查询 | 8 | 目标 |
+| 自建 FTS5 索引与双字切分 | `Document`、`MarkdownHeaderTextSplitter`、`RecursiveCharacterTextSplitter`、jieba `BM25Retriever` | 8 | 当前 |
+| 无向量检索 | `FastEmbedEmbeddings` + `Chroma` | 8 | 当前 |
+| 手写内容哈希增量更新 | LangChain 索引 API（`index` + `SQLRecordManager`） | 8 | 当前 |
+| 无 | `EnsembleRetriever`（RRF）、`ParentDocumentRetriever`、LCEL 并行多问法查询 | 8 | 当前 |
 | 无 | `ContextualCompressionRetriever` + 本地交叉编码器 | 9 | 目标 |
 
 阶段 2 的两处实现取舍：轨迹事件由回调处理器记录、在消费流的循环中推送，而不是在节点内调用 `get_stream_writer`（节点开始回调时取不到 writer）；流式接口保留一个后台线程，只用于浏览器断开后让本轮跑完。
@@ -131,11 +131,11 @@ flowchart LR
 - **失败处理：** MCP 服务不可达或调用失败时抛出 `MCPUnavailable`（HTTP 503）明确提示，本轮不保存、不改用本地工具，也不放宽身份校验；MCP 返回的查询错误作为工具失败交给 Agent，按“查询未成功”答复。
 - **版本约束：** `langchain-mcp-adapters` 最新版（0.3.2）要求 `mcp<2`，因此 `mcp` 固定在 1.x，可选依赖中的 Phoenix 相应解析为兼容 `mcp` 1.x 的版本；适配器支持 `mcp` 2.x 后再一起升级。
 
-## 9. 政策检索与 RAG（目标，阶段 6—9）
+## 9. 政策检索与 RAG（阶段 6—8 当前，阶段 9 目标）
 
-### 9.1 现状问题
+### 9.1 阶段 7 基线：FTS5 文本检索的问题
 
-当前检索按中文双字切分做全文匹配。口语化问题（如“几天内能退”“打开包装还能退吗”）直接检索时找不到任何条款，实际能用是因为识别诉求时模型先把问题改写成政策术语。检索效果因此完全依赖模型改写的措辞，偏差时直接转人工。政策已扩充到 60 条、14 个类别（含新旧版本与易混淆的相近条款），口语化问题的排名问题更加明显，例如“衣服几天内可以退货”排在首位的是发票条款。
+阶段 8 之前的检索按中文双字切分做全文匹配。口语化问题（如“几天内能退”“打开包装还能退吗”）直接检索时找不到任何条款，实际能用是因为识别诉求时模型先把问题改写成政策术语。检索效果因此完全依赖模型改写的措辞，偏差时直接转人工。政策已扩充到 60 条、14 个类别（含新旧版本与易混淆的相近条款），口语化问题的排名问题更加明显，例如“衣服几天内可以退货”排在首位的是发票条款。
 
 **检索基线（阶段 7，FTS5 双字切分 + 适用性过滤，80 题，评测集与检索均确定、可复现）：**
 
@@ -148,7 +148,25 @@ flowchart LR
 - 改写帮不上的：同义改写类（如“开不了机”“发来白色”“起红疹”“超时没到”）两种输入都只有 0.64，因为识别模型把这类话当作办理诉求而非政策咨询，80 题中有 26 题没有生成检索问法；这类问题与条款几乎没有共同的双字，常直接无命中。
 - 多条款问题只召回其中一条（如拆封限制与退货期限），无依据问题有一半被错误地返回了条款（如“以旧换新”命中运费险，“上门安装”命中家电退货期限），说明需要语义检索与得分阈值（阶段 8—9）。
 
-### 9.2 目标流程
+### 9.2 阶段 8：混合检索（当前）
+
+**实现：** 完整条款为父文档；条款按句切出的小块、长文档按标题再按段落切出的段落（依据编号只用于关联父条款）、常见问答为子文档，共 185 个，每个都带指向父条款的 `chunk_id` 与适用条件元数据。BM25（jieba 搜索模式分词，去掉虚词与提问套话，只保留有共同词的命中）与向量检索（余弦相关度下限 0.5，按已知商品、下单日期、原因类型做 Chroma 元数据过滤）各自在子文档上检索并映射为父条款，得分写入元数据；两路由 `EnsembleRetriever` 以 RRF 融合；检索问法与提出问题时的用户原话经 LCEL 并行检索后再按 RRF 合并；随后是适用性过滤与版本冲突检测步骤。父条款快照仍存于 SQLite（规则服务据此核对索引与源数据一致）；子文档经索引 API 增量写入 Chroma，未改动的不重新向量化。
+
+**评测结果（80 题，本地 `bge-small-zh-v1.5`，同一评测集单次运行；检索是确定的，可复现）：**
+
+| 检索方式 | 输入 | Recall@3 | Recall@5 | MRR | 有依据误判为无依据 | 无依据判定准确率 |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| FTS5 基线 | 原话 / 改写 | 0.674 / 0.819 | 0.722 / 0.826 | 0.611 / 0.757 | 8.3% / 6.9% | 0.50 |
+| jieba BM25 | 原话 / 改写 | 0.708 / 0.812 | 0.736 / 0.875 | 0.628 / 0.784 | 1.4% | 0.62 / 0.50 |
+| 本地向量 | 原话 / 改写 | 0.861 / 0.924 | 0.938 / 0.951 | 0.791 / 0.860 | 2.8% | 0.12 / 0.25 |
+| 混合（线上） | 改写 + 原话并行 | 0.924 | 0.951 | 0.800 | 0% | 0.12 |
+
+- 相比基线：线上方式 Recall@3 从 0.819 提升到 0.924（原话输入从 0.674 到 0.806），有依据问题不再被误判为无依据；向量检索补上了“开不了机”“起红疹”等与条款没有共同字词的同义表达。
+- BM25 对比 FTS5：原话输入的 Recall@3/5 与 MRR 都更高；改写输入 Recall@5 与 MRR 更高，Recall@3 低 0.007。
+- 仍需改进：向量检索总能找到相近条款，无依据判定准确率降到 0.12；混合检索的 MRR 低于单独向量检索，说明 BM25 的噪声会挤占排名。两者分别由阶段 9 的无依据阈值与评测驱动的重排序处理。
+- 检索单次约 15 ms（不含首次加载模型约 4 秒）；每一路检索器在 Phoenix 中为 RETRIEVER span，可看到命中的父条款与 `bm25_score` / `vector_score`。
+
+### 9.3 目标流程（阶段 9 补充重排序与无依据判定）
 
 ```mermaid
 flowchart LR
@@ -164,7 +182,7 @@ flowchart LR
 
 | 环节 | 设计 |
 | --- | --- |
-| 语料 | （当前）60 条带版本的结构化条款（14 个类别，`demo_rules.json`）、分章节的《售后服务政策》长文档（`policy_handbook.md`，每段标注依据条款）和 20 条常见问答（`policy_faq.json`，每条带编号与依据条款），均为虚构；长文档与问答在阶段 8 进入检索 |
+| 语料 | （当前）60 条带版本的结构化条款（14 个类别，`demo_rules.json`）、分章节的《售后服务政策》长文档（`policy_handbook.md`，每段标注依据条款）和 20 条常见问答（`policy_faq.json`，每条带编号与依据条款），均为虚构，全部进入检索 |
 | 文档与切分 | 统一为 `Document`，元数据含条款编号、版本、适用商品、生效时间、来源位置；长文档先按标题切分，再控制块大小与重叠 |
 | 向量化 | `FastEmbedEmbeddings` 本地运行 `BAAI/bge-small-zh-v1.5`（ONNX），不依赖中转站向量接口；默认测试使用替身向量 |
 | 向量库 | `Chroma` 持久化到 `data/`，支持元数据过滤；选择它是因为 LangChain 集成成熟、过滤能力完整 |
@@ -235,7 +253,7 @@ after-sales-agent/
 │   ├── tools/        # LangChain 只读工具、白名单与会话身份注入
 │   ├── observability.py  # 可选的本地 Phoenix 追踪
 │   ├── mcp_server.py     # 只读工具 MCP 服务（stdio / Streamable HTTP）
-│   ├── retrieval/    # 政策加载、索引、检索与适用性过滤
+│   ├── retrieval/    # 政策加载、Document 化与切分、本地向量索引、父子检索器、混合检索链与适用性过滤
 │   └── storage/      # SQLite 表结构、种子数据与读写
 ├── web/              # 静态页面与原生 JS 模块
 ├── data/             # 本地业务库与政策索引（不提交）
@@ -244,7 +262,7 @@ after-sales-agent/
 └── artifacts/        # 回放与评测的机器结果（不提交）
 ```
 
-目标阶段预计新增：政策长文档与常见问答数据、检索链模块、检索评测样例；向量库与索引记录存放在 `data/`（不提交）。按任务实际创建，不提前搭空模块。
+阶段 9 预计新增：重排序压缩器与无依据判定（在检索链中），忠实度评测；按任务实际创建，不提前搭空模块。
 
 ## 14. 前端展示（目标）
 

@@ -12,7 +12,7 @@
 | `src/after_sales/storage/logistics.py`、`inventory.py` | 服务启动时补充物流场景和换货库存 |
 | `src/after_sales/domain/demo_rules.json` | 政策原文、适用范围和结构化规则的来源 |
 | `data/demo.sqlite3` | `after-sales-api` 默认使用的业务库 |
-| `data/policy_index.sqlite3` | 政策检索索引，由 `after-sales-policy-index rebuild` 生成 |
+| `data/policy_index.sqlite3`、`data/policy_index-vectors/` | 政策索引（条款快照与本地向量），由 `after-sales-policy-index rebuild` 生成 |
 | `data/p5-*.sqlite3` | 以前演示用过的库，已有办理记录，不能当作全新样例 |
 | `evals/scenarios.json`、`evals/replay.py` | 统一回放样例与入口；每次回放另建独立数据库 |
 | `artifacts/` | 回放生成的结果和数据库，不是默认业务库 |
@@ -97,7 +97,7 @@ uv run python -c "from pathlib import Path; import uvicorn; from after_sales.mai
 
 其余条款只用于 **政策咨询**，可直接提问，例如“衣服试穿过还能退吗”“退款多久到账”“价保怎么申请”“赠品没寄回会怎样”“发票怎么开”。其中服装鞋包、小家电、个护美妆、食品、定制、预售、套装、礼品卡等品类的 SKU（如 `JACKET-DOWN-L`、`AIRFRYER-4L`、`SERUM-30ML`）只存在于政策与检索评测中，演示订单与库存不包含这些商品；不涉及具体商品的通用条款（运费、退款方式、发票等）无需先说明商品。
 
-办理退货时，资格、金额和审批要求由规则服务直接根据结构化政策计算，回复附上规则说明和所用条款，不调用模型解释。政策咨询走检索：目前为本地 SQLite 文本检索加适用范围过滤，引用保留编号、版本和正文。口语化问题依赖模型先改写为政策术语，检索效果的量化见检索评测。修改政策源文件后需执行 `uv run after-sales-policy-index rebuild`。
+办理退货时，资格、金额和审批要求由规则服务直接根据结构化政策计算，回复附上规则说明和所用条款，不调用模型解释。政策咨询走混合检索：jieba 分词的 BM25 与本地向量两路检索条款、长文档和常见问答的小块，返回完整条款，再按商品、下单日期和原因做适用范围过滤；模型改写的检索问法与用户原话并行检索。引用保留编号、版本和正文。目前对政策没有覆盖的问题仍可能返回相近条款（无依据判定在后续阶段完善）。修改政策源文件后需执行 `uv run after-sales-policy-index rebuild`。
 
 ## 5. 推荐演练
 

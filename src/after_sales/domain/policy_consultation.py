@@ -50,6 +50,8 @@ def consult_policy(state: dict, update, content: str, get_order, search, explain
         for key in ("clarification_used", "search_attempts", "handoff"):
             context.pop(key, None)
     progress = {k: context[k] for k in ("clarification_used", "search_attempts") if k in context}
+    # 提出问题的那条原话与检索问法并行检索；补充订单号等澄清消息不作为检索原话。
+    question_message = content if new_question else context.get("question_message", content)
     # 新订单或独立SKU开启新的事实范围，不继承旧商品、日期及原因。
     if ((update.order_id is not None and update.order_id != context.get("order_id"))
             or (update.sku is not None and update.sku != context.get("sku"))
@@ -57,6 +59,7 @@ def consult_policy(state: dict, update, content: str, get_order, search, explain
         context.clear()
         context.update(progress)
     context["question"] = question
+    context["question_message"] = question_message
     for field in update.clear_fields:
         context.pop(field, None)
         if field == "reason":
@@ -89,7 +92,8 @@ def consult_policy(state: dict, update, content: str, get_order, search, explain
             context.pop("ordered_on")
             return _clarify(context, "请提供有效的下单日期，格式为YYYY-MM-DD。", ["ordered_on"])
     context["search_attempts"] = context.get("search_attempts", 0) + 1
-    evidence = search({"question": question, **{key: context.get(key) for key in ("sku", "ordered_on", "reason_kind")}})
+    evidence = search({"question": question, "user_message": question_message,
+                       **{key: context.get(key) for key in ("sku", "ordered_on", "reason_kind")}})
     if evidence["status"] == "conflict":
         return _handoff(context, "policy_conflict", "发现同等适用的条款存在冲突，不能自动选择某个版本。", evidence)
     if evidence["status"] == "clarification_needed":
