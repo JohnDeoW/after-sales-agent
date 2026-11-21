@@ -37,7 +37,7 @@ def _clarify(context: dict, text: str, fields: list[str], evidence: dict | None 
     return _result("clarification_needed", text + "补充后将再核查一次。", fields, policy_result=evidence)
 
 
-def consult_policy(state: dict, update, content: str, get_order, search, explain) -> dict:
+def consult_policy(state: dict, update, content: str, get_order, search, explain, rewrite=None) -> dict:
     context = state.setdefault("policy", {})
     question = update.policy_question or context.get("question") or content
     new_question = question != context.get("question")
@@ -47,7 +47,7 @@ def consult_policy(state: dict, update, content: str, get_order, search, explain
         return _handoff_result(context["handoff"])
     # 已结束的问题可在用户真正更换问题或补充新事实后重开；补充澄清不重置次数。
     if new_question or context.get("handoff"):
-        for key in ("clarification_used", "search_attempts", "handoff"):
+        for key in ("clarification_used", "search_attempts", "handoff", "requery"):
             context.pop(key, None)
     progress = {k: context[k] for k in ("clarification_used", "search_attempts") if k in context}
     # 提出问题的那条原话与检索问法并行检索；补充订单号等澄清消息不作为检索原话。
@@ -92,8 +92,14 @@ def consult_policy(state: dict, update, content: str, get_order, search, explain
             context.pop("ordered_on")
             return _clarify(context, "请提供有效的下单日期，格式为YYYY-MM-DD。", ["ordered_on"])
     context["search_attempts"] = context.get("search_attempts", 0) + 1
-    evidence = search({"question": question, "user_message": question_message,
-                       **{key: context.get(key) for key in ("sku", "ordered_on", "reason_kind")}})
+    facts = {key: context.get(key) for key in ("sku", "ordered_on", "reason_kind")}
+    evidence = search({"question": question, "user_message": question_message, **facts})
+    # 首次没有可靠依据（重排得分低于阈值或无候选）时，由模型换一种问法再检索一次；同一问题只重查一次。
+    if evidence["status"] == "no_match" and rewrite is not None and not context.get("requery"):
+        requery = rewrite(question, question_message)
+        context["requery"] = requery
+        if requery and requery != question:
+            evidence = search({"question": requery, "user_message": question_message, **facts})
     if evidence["status"] == "conflict":
         return _handoff(context, "policy_conflict", "发现同等适用的条款存在冲突，不能自动选择某个版本。", evidence)
     if evidence["status"] == "clarification_needed":
@@ -102,6 +108,10 @@ def consult_policy(state: dict, update, content: str, get_order, search, explain
     if evidence["status"] != "ok":
         if evidence["status"] == "no_match" and not context.get("sku"):
             return _clarify(context, "未找到相关条款，请补充商品SKU或本人订单号。", ["sku"], evidence)
+        if evidence["status"] == "no_match":
+            return _handoff(context, "no_match", "演示政策中没有找到能回答该问题的可靠条款"
+                            + ("（已换一种问法重新检索）" if context.get("requery") else "")
+                            + "，不能凭推测给出答复，已停止自动判断。", evidence)
         return _handoff(context, evidence["status"], "未取得可用于回答的适用政策依据，已停止自动判断。", evidence)
     answer = validate_answer(explain(question, evidence["policies"]), evidence["policies"])
     if answer["status"] == "no_answer":

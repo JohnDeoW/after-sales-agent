@@ -54,7 +54,7 @@ class WriteOutcomeUnknown(RuntimeError):
 class Limits:
     # max_steps 作为 LangGraph recursion_limit；含等待节点在内的最长路径约 12 步。
     max_steps: int = 16
-    max_model_calls: int = 2
+    max_model_calls: int = 3  # 识别 + 政策解释；政策首次无依据时另有一次改写重查
     max_tool_calls: int = 4
     turn_seconds: float = 255
     max_clarification_rounds: int = 3

@@ -1,4 +1,5 @@
-"""统一评测入口：场景回放（离线预设 / 真实模型）与检索评测（retrieval，不调用模型），分别保存机器结果。"""
+"""统一评测入口：场景回放（离线预设 / 真实模型）、检索评测（retrieval，不调用模型）与回答忠实度评测
+（faithfulness，调用真实模型），分别保存机器结果。"""
 
 import argparse
 import csv
@@ -136,18 +137,22 @@ def finish_refund(client, request, proposal, scenario, result):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--mode", choices=["offline", "live", "retrieval"], default="offline")
+    parser.add_argument("--mode", choices=["offline", "live", "retrieval", "faithfulness"], default="offline")
     parser.add_argument("--select", default="core", help="core / all / 组名 / 场景ID，多个值用逗号分隔；holdout为独立检查组")
     parser.add_argument("--list", action="store_true")
     parser.add_argument("--query", choices=["original", "rewritten", "combined", "all"], default="all",
                         help="检索评测的输入：用户原话、模型改写问法、两者并行合并（线上方式）或全部")
-    parser.add_argument("--retriever", choices=["hybrid", "bm25", "vector", "all"], default="hybrid",
-                        help="检索评测的检索方式：BM25 + 向量混合、仅 BM25、仅向量或全部")
+    parser.add_argument("--retriever", choices=["rerank", "hybrid", "bm25", "vector", "all"], default="rerank",
+                        help="检索方式：混合 + 重排（线上默认）、BM25 + 向量混合、仅 BM25、仅向量或全部")
+    parser.add_argument("--threshold", type=float, default=None, help="重排“无依据”阈值（默认取线上配置）")
+    parser.add_argument("--limit", type=int, default=24, help="端到端回答评测抽取的有依据样例数（0 为全部；无依据样例总是全部纳入）")
     parser.add_argument("--refresh-rewrites", action="store_true",
                         help="检索评测前用真实识别模型重新生成改写问法并写回评测集（会产生模型调用）")
     args = parser.parse_args()
     if args.mode == "retrieval":
         return run_retrieval(args)
+    if args.mode == "faithfulness":
+        return run_faithfulness(args)
     scenarios = json.loads(Path(__file__).with_name("scenarios.json").read_text(encoding="utf-8"))
     if args.list:
         for s in scenarios: print(s["id"], s["group"])
@@ -184,15 +189,18 @@ def run_retrieval(args) -> int:
     directory.mkdir(parents=True)
     index = directory / "policies.sqlite3"
     rebuild_index(index_path=index)
-    from after_sales.retrieval.index import EMBEDDING_MODEL, release_vector_stores
+    from after_sales.retrieval.index import EMBEDDING_MODEL, RERANKER_MODEL, release_vector_stores
+    from after_sales.retrieval.search import RERANK_THRESHOLD
     from retrieval_eval import QUERY_FIELDS
     fields = QUERY_FIELDS if args.query == "all" else [args.query]
-    modes = ["bm25", "vector", "hybrid"] if args.retriever == "all" else [args.retriever]
+    modes = ["bm25", "vector", "hybrid", "rerank"] if args.retriever == "all" else [args.retriever]
+    threshold = RERANK_THRESHOLD if args.threshold is None else args.threshold
     if any(f != "original" for f in fields) and not all(case["rewritten"] for case in data["cases"]):
         raise SystemExit("评测集尚无改写问法，请先加 --refresh-rewrites 生成。")
-    reports = [evaluate(field, index, data["cases"], mode) for mode in modes for field in fields]
-    meta = {"mode": "retrieval", "retriever": "jieba BM25 + 本地向量（RRF）父子检索 + 适用性过滤",
-            "embedding_model": EMBEDDING_MODEL, "cases": len(data["cases"]),
+    reports = [evaluate(field, index, data["cases"], mode, threshold) for mode in modes for field in fields]
+    meta = {"mode": "retrieval", "retriever": "jieba BM25 + 本地向量（RRF）父子检索 + 交叉编码器重排 + 适用性过滤",
+            "embedding_model": EMBEDDING_MODEL, "reranker_model": RERANKER_MODEL, "rerank_threshold": threshold,
+            "cases": len(data["cases"]),
             "rewritten_by": data.get("rewritten_by"), "business_date": str(business_today())}
     write_results(directory, reports, meta)
     for report in reports:
@@ -204,6 +212,31 @@ def run_retrieval(args) -> int:
     if settings and settings.phoenix_enabled:
         print("Phoenix 实验：", log_phoenix_experiment(settings, reports, data["cases"], index))
     release_vector_stores()
+    print("机器结果：", directory)
+    return 0
+
+
+def run_faithfulness(args) -> int:
+    from after_sales.observability import flush as flush_traces, setup_tracing
+    from after_sales.retrieval.index import release_vector_stores
+    from faithfulness_eval import evaluate_faithfulness, pick
+    from retrieval_eval import load_cases
+    if args.retriever == "all":
+        raise SystemExit("忠实度评测请指定一种检索方式。")
+    settings = load_settings()
+    phoenix = setup_tracing(settings)  # 开启 Phoenix 时，回答与评判的模型调用都会记录为 trace
+    cases = pick(load_cases()["cases"], args.limit)
+    directory = PROJECT_ROOT / "artifacts" / ("faithfulness-" + datetime.now().strftime("%Y%m%d-%H%M%S") + "-" + secrets.token_hex(3))
+    directory.mkdir(parents=True)
+    index = directory / "policies.sqlite3"
+    rebuild_index(index_path=index)
+    report = evaluate_faithfulness(settings, cases, index, args.retriever)
+    (directory / "results.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(json.dumps(report["summary"], ensure_ascii=False))
+    release_vector_stores()
+    flush_traces()
+    if phoenix:
+        print("Phoenix：", phoenix)
     print("机器结果：", directory)
     return 0
 

@@ -3,7 +3,8 @@
 - 指标：Recall@3、Recall@5、MRR（只统计应有答案的样例）、无依据判定准确率（应答“无依据”的样例）、
   有依据样例被误判为无依据的比例、检索耗时；并按诉求、退货原因、商品品类、检索难点分组。
 - 输入：用户原话（original）、模型改写问法（rewritten，由识别模型生成后存入评测集），或两者并行检索后合并
-  （combined，与线上政策咨询一致）；检索方式可选 hybrid（BM25 + 向量）、bm25、vector，用于对比。
+  （combined，与线上政策咨询一致）；检索方式可选 rerank（混合 + 交叉编码器重排，线上默认）、hybrid（BM25 + 向量）、
+  bm25、vector，用于对比；重排方式记录每题最高重排得分，用于校准“无依据”阈值。
 - 期望条款写作 clause_id，或 clause_id@version（需核对版本时）。
 - 开启 Phoenix 时同时把评测集与结果记录为 Phoenix 实验。
 """
@@ -15,7 +16,7 @@ from collections import defaultdict
 from pathlib import Path
 from time import perf_counter
 
-from after_sales.retrieval.search import search_policy
+from after_sales.retrieval.search import DEFAULT_MODE, RERANK_THRESHOLD, search_policy
 
 CASES_PATH = Path(__file__).with_name("retrieval_cases.json")
 GROUPS = ("intent", "reason", "product", "difficulty")
@@ -32,15 +33,17 @@ def matches(expected: str, policy: dict) -> bool:
 QUERY_FIELDS = ("original", "rewritten", "combined")
 
 
-def retrieve(case: dict, query_field: str, index_path: Path, mode: str = "hybrid") -> dict:
+def retrieve(case: dict, query_field: str, index_path: Path, mode: str = DEFAULT_MODE,
+             threshold: float = RERANK_THRESHOLD) -> dict:
     rewritten = case["rewritten"] or case["question"]
     query, message = {"original": (case["question"], None), "rewritten": (rewritten, None),
                       "combined": (rewritten, case["question"])}[query_field]
     started = perf_counter()
-    result = search_policy(query, user_message=message, index_path=index_path, mode=mode, **case["context"])
+    result = search_policy(query, user_message=message, index_path=index_path, mode=mode, threshold=threshold, **case["context"])
     elapsed = (perf_counter() - started) * 1000
     return {"query": query, "status": result["status"], "missing_fields": result["missing_fields"],
-            "ranked": [p["chunk_id"] for p in result["policies"]], "policies": result["policies"], "latency_ms": round(elapsed, 2)}
+            "ranked": [p["chunk_id"] for p in result["policies"]], "policies": result["policies"],
+            "best_score": result["best_score"], "latency_ms": round(elapsed, 2)}
 
 
 def score(case: dict, retrieved: dict) -> dict:
@@ -82,21 +85,24 @@ def grouped(rows: list[dict]) -> dict:
     return groups
 
 
-def evaluate(query_field: str, index_path: Path, cases: list[dict], mode: str = "hybrid") -> dict:
+def evaluate(query_field: str, index_path: Path, cases: list[dict], mode: str = DEFAULT_MODE,
+             threshold: float = RERANK_THRESHOLD) -> dict:
     rows = []
     for case in cases:
-        retrieved = retrieve(case, query_field, index_path, mode)
+        retrieved = retrieve(case, query_field, index_path, mode, threshold)
         rows.append({"id": case["id"], "query": retrieved["query"], "answerable": case["answerable"],
                      "expected": case["expected"], "tags": case["tags"], "note": case["note"],
                      "status": retrieved["status"], "missing_fields": retrieved["missing_fields"],
-                     "ranked": retrieved["ranked"], "latency_ms": retrieved["latency_ms"], **score(case, retrieved)})
-    return {"query_field": query_field, "retriever": mode, "summary": aggregate(rows), "groups": grouped(rows), "rows": rows}
+                     "ranked": retrieved["ranked"], "best_score": retrieved["best_score"], "latency_ms": retrieved["latency_ms"],
+                     **score(case, retrieved)})
+    return {"query_field": query_field, "retriever": mode, "threshold": threshold if mode == "rerank" else None,
+            "summary": aggregate(rows), "groups": grouped(rows), "rows": rows}
 
 
 def write_results(directory: Path, reports: list[dict], meta: dict) -> None:
     (directory / "results.json").write_text(json.dumps({**meta, "reports": reports}, ensure_ascii=False, indent=2), encoding="utf-8")
     fields = ["retriever", "query_field", "id", "query", "answerable", "status", "expected", "ranked", "recall@3", "recall@5", "mrr",
-              "first_hit_rank", "false_no_answer", "no_answer_correct", "latency_ms"]
+              "first_hit_rank", "false_no_answer", "no_answer_correct", "best_score", "latency_ms"]
     with (directory / "results.csv").open("w", encoding="utf-8-sig", newline="") as stream:
         writer = csv.DictWriter(stream, fieldnames=fields, extrasaction="ignore")
         writer.writeheader()

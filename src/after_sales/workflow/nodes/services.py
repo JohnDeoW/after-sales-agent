@@ -30,5 +30,9 @@ def policy_consultation(s: State, runtime: Runtime[TurnContext]) -> dict:
 
     def explain(question, policies):
         return model_step("PolicyAnswer", lambda: ctx.deps.policy_explainer(question, policies))
+    rewrite = None
+    if ctx.deps.policy_rewriter is not None:
+        def rewrite(question, message):
+            return model_step("PolicyRequery", lambda: ctx.deps.policy_rewriter(question, message))
     return {"result": consult_policy(s["context"]["state"], s["update"], ctx.content,
-                                      lambda order_id: get_order(runtime, order_id), search, explain)}
+                                      lambda order_id: get_order(runtime, order_id), search, explain, rewrite)}

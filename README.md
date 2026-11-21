@@ -36,7 +36,7 @@ LLM_TIMEOUT_SECONDS=120
 
 - `LLM_TIMEOUT_SECONDS` 是单次模型调用的等待上限，默认 120 秒。超过上限按“模型响应超时”处理，不重试，避免再多等一个完整上限。
 - 只有连接失败或中转站返回 5xx 错误时才自动重试一次。限流（HTTP 429）不重试。
-- 一轮对话最多调用两次模型：办理退货、换货只调用一次（理解诉求），资格、金额和政策依据由规则代码给出；用自然语言查询订单、物流、申请、案件或工单时调用两次（理解诉求 + Agent 选择只读工具）；政策咨询调用两次（理解诉求 + 依据检索到的条款解释）。页面按钮发出的固定指令不调用模型。整轮预算随配置计算为 `2 × 120 + 15 = 255` 秒。
+- 一轮对话最多调用三次模型：办理退货、换货只调用一次（理解诉求），资格、金额和政策依据由规则代码给出；用自然语言查询订单、物流、申请、案件或工单时调用两次（理解诉求 + Agent 选择只读工具）；政策咨询通常调用两次（理解诉求 + 依据检索到的条款解释），首次检索没有可靠依据时多一次改写问法重查。页面按钮发出的固定指令不调用模型。整轮预算随配置计算为 `3 × 120 + 15 = 375` 秒。
 - 实际耗时取决于模型和中转站。开发时的实测：一次模型调用多在 5—10 秒，偶尔超过 25 秒，历史上最长约 60 秒；其中大部分时间花在等待第一段数据返回。以上都是等待预算和参考数据，不是耗时承诺，也不能改变中转站自己的限制。
 
 其他可选配置通常不必调整：
@@ -56,7 +56,7 @@ uv run after-sales-policy-index rebuild
 ```
 
 - 第一条命令创建 `data/demo.sqlite3`，按香港时区当天生成订单日期；文件已存在时保留全部记录，不重置日期、退款或库存。
-- 第二条命令从政策条款、长文档与常见问答重建政策索引：完整条款快照写入 `data/policy_index.sqlite3`，检索用的小块用本地向量模型 `BAAI/bge-small-zh-v1.5` 向量化后写入 `data/policy_index-vectors/`（Chroma）。不调用中转站，也不清空业务数据库。模型缓存在 `data/models/`，首次使用时自动下载（约 90 MB）。重建是增量的：内容未变的小块直接跳过，删除的条款从索引移除，输出中可看到新增、跳过、删除的数量。
+- 第二条命令从政策条款、长文档与常见问答重建政策索引：完整条款快照写入 `data/policy_index.sqlite3`，检索用的小块用本地向量模型 `BAAI/bge-small-zh-v1.5` 向量化后写入 `data/policy_index-vectors/`（Chroma）。不调用中转站，也不清空业务数据库。模型缓存在 `data/models/`，首次使用时自动下载（约 90 MB）。政策咨询还会用本地交叉编码器 `BAAI/bge-reranker-base` 对候选条款重排序，同样缓存在 `data/models/`，首次检索时自动下载（约 1 GB）。重建是增量的：内容未变的小块直接跳过，删除的条款从索引移除，输出中可看到新增、跳过、删除的数量。
 - 服务首次启动会为业务库补充会话、物流、库存等表及场景。
 
 若要从全新状态练习，加 `--reset` 重置默认库：删除 `data/demo.sqlite3` 后按当天日期重建，清空其中全部案件、退款、会话和库存预留，其他库文件不受影响。重置前先停止正在使用该库的服务，完成后直接启动即可。
@@ -135,11 +135,14 @@ uv run python -X utf8 evals/replay.py --mode live --select holdout
 **检索评测**（同一入口，不调用模型、不需要密钥）：用 `evals/retrieval_cases.json` 中的 80 道虚构问题评测政策检索，结果写入 `artifacts/retrieval-…/results.json` 与 `results.csv`。
 
 ```powershell
-# 混合检索，三种输入各跑一遍
+# 线上检索方式（混合检索 + 重排序），三种输入各跑一遍
 uv run python -X utf8 evals/replay.py --mode retrieval
 
-# 对比 BM25、向量与混合检索
+# 对比仅 BM25、仅向量、混合检索、混合检索 + 重排序
 uv run python -X utf8 evals/replay.py --mode retrieval --retriever all --query combined
+
+# 用其他“无依据”阈值评测重排序
+uv run python -X utf8 evals/replay.py --mode retrieval --query combined --threshold -2.5
 
 # 只跑用户原话
 uv run python -X utf8 evals/replay.py --mode retrieval --query original
@@ -148,11 +151,23 @@ uv run python -X utf8 evals/replay.py --mode retrieval --query original
 uv run python -X utf8 evals/replay.py --mode retrieval --refresh-rewrites
 ```
 
-`--retriever` 可选 `hybrid`（默认，BM25 + 本地向量混合）、`bm25`、`vector` 或 `all`，`--query` 可选 `original`（用户原话）、`rewritten`（模型改写问法）、`combined`（两者并行检索后合并，与线上一致）或 `all`，用于对比不同方案。检索评测使用本地向量模型，不调用中转站。
+`--retriever` 可选 `rerank`（默认，与线上一致：BM25 + 本地向量混合后由交叉编码器重排，重排得分低于阈值视为无依据）、`hybrid`（只做混合检索）、`bm25`、`vector` 或 `all`，`--query` 可选 `original`（用户原话）、`rewritten`（模型改写问法）、`combined`（两者并行检索后合并，与线上一致）或 `all`，用于对比不同方案。检索评测使用本地向量与重排模型，不调用中转站；重排序方式每题约 1 秒。
 
 输出 Recall@3、Recall@5、MRR（只统计有依据的问题）、无依据判定准确率、有依据问题被误判为无依据的比例和检索耗时，并按诉求、退货原因、商品品类、检索难点分组。每道题都标注了期望条款（需要核对版本时写为“编号@版本”）和考察的检索难点。`.env` 开启 Phoenix 且本地 Phoenix 运行时，评测集与结果同时记录为 Phoenix 的数据集和实验。
 
-运行全部业务测试（pytest 统一入口，不调用模型、不发起网络请求，约 1 分钟；`tests/` 只在本地开发环境中保留，不随仓库发布）：
+**端到端回答评测**（会调用真实模型并产生 API 消耗）：按线上政策咨询的完整路径处理评测题：检索；无可靠依据时由模型改写问法重查一次；模型解释回答。随后另用一次模型调用作为评判，逐项核对回答里的政策结论是否都能由所引用条款原文直接支持。结果写入 `artifacts/faithfulness-…/results.json`。
+
+```powershell
+# 默认抽 24 道有依据的题，加全部 8 道无依据的题
+uv run python -X utf8 evals/replay.py --mode faithfulness
+
+# 全部 80 题
+uv run python -X utf8 evals/replay.py --mode faithfulness --limit 0
+```
+
+输出忠实率、引用命中期望条款的比例、有依据问题被误拒的比例、无依据问题正确拒答的比例、改写重查的次数与挽回数，以及检索和回答的平均耗时。这项评测只在离线运行，不增加在线对话的模型调用。
+
+运行全部业务测试（pytest 统一入口，不调用模型、不发起网络请求，约 2—3 分钟；`tests/` 只在本地开发环境中保留，不随仓库发布）：
 
 ```powershell
 uv run pytest
@@ -225,7 +240,7 @@ MCP_SERVER_URL=http://127.0.0.1:8000/mcp/
 | 提示未配置 `LLM_API_KEY` | 检查本项目 `.env`，不要把文件放到父目录；配置后重启 |
 | 提示“无法连接只读工具 MCP 服务”（HTTP 503） | 检查 `.env` 的 `MCP_SERVER_URL` 与网页服务端口一致（默认 `http://127.0.0.1:8000/mcp/`），或单独启动的 MCP 服务仍在运行；不使用 MCP 时删除该配置并重启 |
 | 开启 Phoenix 后启动报错“未安装可观测性依赖” | 运行 `uv sync --extra observability` 后重启；不需要追踪时把 `PHOENIX_ENABLED` 改回 `false` |
-| 重建政策索引时下载模型失败或很慢 | 向量模型首次使用需要从 Hugging Face 下载到 `data/models/`；可设置代理或 `HF_ENDPOINT` 镜像后重试，下载一次后离线可用 |
+| 重建政策索引时下载模型失败或很慢 | 向量模型与重排模型首次使用需要从 Hugging Face 下载到 `data/models/`；可设置代理或 `HF_ENDPOINT` 镜像后重试，下载一次后离线可用 |
 | 提示数据库或政策索引不存在 | 执行初始化、索引重建；自定义库则核对启动命令里的数据库路径 |
 | 端口被占用 | 在原服务终端停止服务，或选其他端口；不要同时向同一端口启动两个服务 |
 | 提示“模型响应超时”（HTTP 504） | 模型在 `LLM_TIMEOUT_SECONDS` 内没有返回结果，多为模型或中转站响应慢。本轮消息未保存、已有信息保留，输入框保留原文，稍后重发即可。经常出现时可适当调大该配置并重启 |

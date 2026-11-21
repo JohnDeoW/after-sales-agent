@@ -2,6 +2,7 @@
 
 - 向量化使用本地 FastEmbed 模型（BAAI/bge-small-zh-v1.5，ONNX），模型缓存于 data/models，不调用中转站；
   测试环境设置 AFTER_SALES_EMBEDDINGS=fake 时使用确定性替身向量，不加载模型；
+- 重排序使用本地交叉编码器（BAAI/bge-reranker-base，ONNX），同样缓存于 data/models；
 - 子文档经 index() + SQLRecordManager 按内容哈希增量写入：未改动的不重新计算向量，删除的从索引移除；
 - 父条款完整快照写入 policy_chunks 表，供父子检索返回完整条款，并供规则服务核对索引与源数据一致。
 """
@@ -20,8 +21,10 @@ from after_sales.retrieval.policies import FAQ_PATH, HANDBOOK_PATH, POLICY_PATH,
 INDEX_PATH = PROJECT_ROOT / "data" / "policy_index.sqlite3"
 MODEL_DIR = PROJECT_ROOT / "data" / "models"
 EMBEDDING_MODEL = "BAAI/bge-small-zh-v1.5"
+RERANKER_MODEL = "BAAI/bge-reranker-base"
 COLLECTION = "policy_children"
 _embeddings = None
+_reranker = None
 _stores: dict = {}
 CHAINS: dict = {}  # 检索链缓存（search.py 使用），持有向量库引用，释放时一并清空
 
@@ -37,6 +40,16 @@ def get_embeddings():
             from langchain_community.embeddings import FastEmbedEmbeddings
             _embeddings = FastEmbedEmbeddings(model_name=EMBEDDING_MODEL, cache_dir=str(MODEL_DIR))
     return _embeddings
+
+
+def get_reranker():
+    """进程内只加载一次本地交叉编码器；替身向量环境下用词覆盖率替身。"""
+    global _reranker
+    if _reranker is None:
+        from after_sales.retrieval.retrievers import FastEmbedCrossEncoder, TokenOverlapCrossEncoder
+        _reranker = (TokenOverlapCrossEncoder() if os.environ.get("AFTER_SALES_EMBEDDINGS") == "fake"
+                     else FastEmbedCrossEncoder(RERANKER_MODEL, str(MODEL_DIR)))
+    return _reranker
 
 
 def vector_dir(index_path: Path) -> Path:

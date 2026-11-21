@@ -3,18 +3,22 @@
 - ParentBM25Retriever：BM25Retriever 子类，jieba 分词，只保留得分大于 0（有共同词）的子文档；
 - ScoredParentDocumentRetriever：ParentDocumentRetriever 子类，用带相关度的向量检索并按下限过滤，
   支持 Chroma 元数据过滤（search_kwargs["filter"]）；
+- ScoredReranker：交叉编码器重排压缩器（BaseDocumentCompressor），保留重排得分供“无依据”阈值判断；
+  由 ContextualCompressionRetriever 包装混合检索使用；
 - 两路结果由 EnsembleRetriever 以 RRF 融合（见 search.py）。得分在 Phoenix 的检索 span 中可见。
 """
 
 import logging
 import re
+from collections.abc import Sequence
 from typing import Any
 
 import jieba
 from langchain_classic.retrievers import ParentDocumentRetriever
 from langchain_community.retrievers import BM25Retriever
+from langchain_community.cross_encoders import BaseCrossEncoder
 from langchain_core.callbacks import CallbackManagerForRetrieverRun
-from langchain_core.documents import Document
+from langchain_core.documents import BaseDocumentCompressor, Document
 
 from after_sales.retrieval.documents import ID_KEY
 
@@ -75,3 +79,39 @@ class ScoredParentDocumentRetriever(ParentDocumentRetriever):
         hits = self.vectorstore.similarity_search_with_relevance_scores(query, k=self.child_k, **self.search_kwargs)
         return _parents([(doc, score) for doc, score in hits if score >= self.min_relevance],
                         self.docstore, "vector_score", self.parent_k)
+
+
+class FastEmbedCrossEncoder(BaseCrossEncoder):
+    """本地交叉编码器（FastEmbed ONNX，如 BAAI/bge-reranker-base），输出未归一化的相关度得分。"""
+
+    def __init__(self, model_name: str, cache_dir: str):
+        from fastembed.rerank.cross_encoder import TextCrossEncoder
+        self.model = TextCrossEncoder(model_name=model_name, cache_dir=cache_dir)
+
+    def score(self, text_pairs: list[tuple[str, str]]) -> list[float]:
+        return [float(value) for value in self.model.rerank_pairs(text_pairs)]
+
+
+class TokenOverlapCrossEncoder(BaseCrossEncoder):
+    """测试替身：按问题词在文档中的覆盖率给分（-5 到 5），不加载模型。"""
+
+    def score(self, text_pairs: list[tuple[str, str]]) -> list[float]:
+        scores = []
+        for query, text in text_pairs:
+            words = set(tokenize(query))
+            scores.append(10 * len(words & set(tokenize(text))) / len(words) - 5 if words else -5.0)
+        return scores
+
+
+class ScoredReranker(BaseDocumentCompressor):
+    """用交叉编码器给（问题，完整条款）打分并重排，得分写入 rerank_score。"""
+    model: Any
+    top_n: int = 8
+
+    def compress_documents(self, documents: Sequence[Document], query: str, callbacks=None) -> Sequence[Document]:
+        if not documents:
+            return []
+        scores = self.model.score([(query, doc.page_content) for doc in documents])
+        ranked = sorted(zip(documents, scores), key=lambda pair: pair[1], reverse=True)[:self.top_n]
+        return [Document(id=doc.id, page_content=doc.page_content,
+                         metadata={**doc.metadata, "rerank_score": round(float(score), 4)}) for doc, score in ranked]

@@ -20,7 +20,7 @@ from after_sales.api.exchanges import router as exchange_router
 from after_sales.api.web import router as web_router, WEB_ROOT
 from after_sales.domain.return_events import WarehouseRequired
 from after_sales.agent.intake import RequestExtractor, IntakeUnavailable
-from after_sales.agent.policy import PolicyExplainer
+from after_sales.agent.policy import PolicyExplainer, PolicyQueryRewriter
 from after_sales.agent.llm import create_model
 from after_sales.agent.query_agent import RuleToolSelector
 from after_sales.agent.mcp_tools import MCPToolProvider, MCPUnavailable
@@ -42,14 +42,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     initialize_session_storage(app.state.customer_service.db_path)
     extractor = app.state.extractor or RequestExtractor(app.state.settings)
     explainer = app.state.policy_explainer or PolicyExplainer(app.state.settings)
+    # 离线替身（注入识别器）时不做改写重查，除非显式注入改写替身。
+    rewriter = app.state.policy_rewriter or (None if app.state.extractor is not None else PolicyQueryRewriter(app.state.settings))
     # 注入替身识别器（测试与离线回放）时，查询工具也由规则替身选择，不调用真实模型。
     selector = app.state.tool_selector or (RuleToolSelector() if app.state.extractor is not None else create_model(app.state.settings))
     limits = Limits()
-    # 一轮最多两次模型调用；随单次超时同步预算，另留业务处理时间。
+    # 一轮最多三次模型调用；随单次超时同步预算，另留业务处理时间。
     limits = replace(limits, turn_seconds=limits.max_model_calls * app.state.settings.llm_timeout_seconds + 15)
     mcp = MCPToolProvider(app.state.settings.mcp_server_url) if app.state.settings.mcp_server_url else None
     app.state.workflow = AfterSalesWorkflow(app.state.customer_service, extractor,
-                                           limits=limits, policy_explainer=explainer, policy_index_path=app.state.policy_index_path,
+                                           limits=limits, policy_explainer=explainer, policy_rewriter=rewriter, policy_index_path=app.state.policy_index_path,
                                            tool_selector=selector, mcp=mcp)
     # 挂载在 /mcp/ 的只读工具 MCP 服务需要运行自己的会话管理器。
     async with app.state.mcp_app.router.lifespan_context(app.state.mcp_app):
@@ -58,12 +60,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     flush_traces()
 
 
-def create_app(db_path: Path = DEMO_DB_PATH, *, extractor=None, policy_explainer=None,
+def create_app(db_path: Path = DEMO_DB_PATH, *, extractor=None, policy_explainer=None, policy_rewriter=None,
                policy_index_path: Path = INDEX_PATH, tool_selector=None) -> FastAPI:
     application = FastAPI(title="商品售后服务 Agent", lifespan=lifespan)
     application.state.customer_service = CustomerService(db_path)
     application.state.extractor = extractor
     application.state.policy_explainer = policy_explainer
+    application.state.policy_rewriter = policy_rewriter
     application.state.policy_index_path = policy_index_path
     application.state.tool_selector = tool_selector
     # 只读工具 MCP 服务（Streamable HTTP），身份取请求头 X-After-Sales-Session。
