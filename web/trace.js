@@ -30,7 +30,10 @@ const intents = { return: "退货", order_query: "订单查询", return_query: "
 const results = { clarification_needed: "需要澄清", order_found: "已找到订单", order_not_found: "未找到订单", logistics_found: "已找到物流",
   ticket_found: "已找到工单", case_found: "已找到案件", return_request_found: "已找到申请", exchange_request_found: "已找到换货申请",
   workflow_handoff: "已转人工", policy_answered: "已答复政策", policy_handoff: "政策待人工", ready_for_evaluation: "信息已齐",
-  needs_policy: "缺少政策依据", stopped: "已停止", error: "失败", ok: "完成", resumed: "已恢复等待点" };
+  needs_policy: "缺少政策依据", stopped: "已停止", error: "失败", ok: "完成", resumed: "已恢复等待点",
+  ticket_created: "已建人工工单", investigation_created: "已建调查工单", handoff_requested: "已请求人工",
+  application_accepted: "申请已受理", exchange_proposed: "已生成换货方案", exchange_out_of_stock: "目标规格缺货",
+  exchange_unavailable: "暂不能换货", interrupted: "已暂停等待", conflict: "政策版本冲突" };
 const runWaiting = { awaiting_confirmation: "方案已生成，等待你核对并确认。", awaiting_approval: "等待客服审批当前方案。",
   workflow_handoff: "自动办理已停止，已有信息已交给人工。", policy_handoff: "政策依据不足或有冲突，等待人工核对。",
   error: "本轮处理失败，请核对记录后重试。", stopped: "本轮已按预算停止，未完成办理。" };
@@ -201,8 +204,8 @@ export function renderTrace(value, progress = null) {
   for (const event of events) counts[event.kind] = (counts[event.kind] || 0) + 1;
   const stats = el("div", undefined, "trace-stats");
   for (const [name, number] of [["总耗时", value.duration_ms == null ? "…" : ms(value.duration_ms)],
-    ["流程节点", usage.steps ?? counts.node], ["模型调用（上限）", budget(usage.model_calls ?? counts.model, limits.max_model_calls)],
-    ["工具调用（上限）", budget(usage.tool_calls ?? counts.tool, limits.max_tool_calls)],
+    ["流程节点", usage.steps ?? counts.node], ["模型调用 / 上限", budget(usage.model_calls ?? counts.model, limits.max_model_calls)],
+    ["工具调用 / 上限", budget(usage.tool_calls ?? counts.tool, limits.max_tool_calls)],
     ["输入 token", usage.tokens?.input_tokens ?? "—"], ["输出 token", usage.tokens?.output_tokens ?? "—"]]) {
     const stat = el("div", undefined, "trace-stat");
     stat.append(el("span", String(number)), el("small", name));

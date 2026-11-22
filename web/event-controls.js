@@ -52,7 +52,11 @@ export function renderEventQueue(root, items, selected, onSelect) {
     const product = item.product_name || item.snapshot?.product_name || item.details?.product_name;
     row.append(el("strong", type + (product ? " · " + product : "")),
       statusPill(item.status, item.status_label || ticketLabel(item.status)));
-    button.append(row, el("span", item.id, "item-id"));
+    button.append(row);
+    if (item.type === "refund" && item.refund_amount_cents != null) {
+      button.append(el("span", `${item.order_id} · 预计退款 ${(item.refund_amount_cents / 100).toFixed(2)} 元`, "muted"));
+    }
+    button.append(el("span", item.id, "item-id"));
     button.setAttribute("aria-current", String(selected?.id === item.id && selected?.type === item.type));
     button.addEventListener("click", () => onSelect({ type: item.type, id: item.id }));
     root.append(button);

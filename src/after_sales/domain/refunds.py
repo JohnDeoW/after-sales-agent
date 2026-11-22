@@ -70,7 +70,7 @@ class RefundService:
         with connect_database(self.db_path) as connection:
             support_user(connection, session_id)
             return [dict(row) for row in connection.execute("""
-                SELECT r.id, r.status, c.order_id, p.order_item_id, p.refund_amount_cents,
+                SELECT r.id, r.status, c.order_id, p.order_item_id, p.refund_amount_cents, i.product_name,
                        o.id AS operation_id, o.status AS operation_status,
                        COALESCE((SELECT s.scenario FROM refund_demo_scenarios s
                                  WHERE s.request_id = r.id ORDER BY s.rowid DESC LIMIT 1), 'normal') AS scenario
@@ -78,6 +78,7 @@ class RefundService:
                 JOIN confirmations f ON f.id = r.confirmation_id
                 JOIN proposals p ON p.id = f.proposal_id
                 JOIN cases c ON c.id = p.case_id
+                JOIN order_items i ON i.id = p.order_item_id
                 LEFT JOIN refund_operations o ON o.request_id = r.id
                 ORDER BY r.rowid DESC
             """)]

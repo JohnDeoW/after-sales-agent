@@ -3,7 +3,7 @@
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse
 
-from after_sales.api.customer import Service, Session
+from after_sales.api.customer import Service, get_session_id
 from after_sales.config import PROJECT_ROOT, business_today
 from after_sales.domain.customer_service import InvalidSession
 from after_sales.storage.database import connect_database
@@ -20,16 +20,19 @@ def home() -> FileResponse:
 
 
 @router.get("/demo/sessions/current")
-def current_demo_session(service: Service, session_id: Session) -> dict:
+def current_demo_session(request: Request, service: Service) -> dict:
+    """页面启动时探测当前标签页的身份；没有或已失效的会话返回 user=null（不是错误），由页面显示身份选择。"""
+    try:
+        session_id = get_session_id(request)
+    except InvalidSession:
+        return {"user": None}
     with connect_database(service.db_path) as connection:
         row = connection.execute(
             """SELECT u.id, u.display_name, u.role FROM sessions s
                JOIN users u ON u.id = s.user_id WHERE s.id = ?
                AND u.role IN ('customer', 'support', 'warehouse')""", (session_id,),
         ).fetchone()
-    if row is None:
-        raise InvalidSession("会话无效，请重新选择演示身份。")
-    return {"user": dict(row)}
+    return {"user": dict(row) if row else None}
 
 
 @router.post("/demo/reset")

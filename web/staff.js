@@ -216,6 +216,11 @@ export function initStaff() {
   $("#refresh-events").addEventListener("click", () => eventTask(refreshEvents));
   $("#refresh-warehouse").addEventListener("click", () => eventTask(refreshWarehouse));
   for (const button of document.querySelectorAll("#support-tabs button")) {
-    button.addEventListener("click", () => showSupportView(button.dataset.view));
+    button.addEventListener("click", () => {
+      showSupportView(button.dataset.view);
+      // 切换视图时读取最新记录，避免看到切换前的旧状态。
+      if (button.dataset.view === "events") eventTask(refreshEvents);
+      else supportTask(refreshSupport);
+    });
   }
 }

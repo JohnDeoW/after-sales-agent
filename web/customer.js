@@ -1,7 +1,7 @@
 // 客户工作台：左侧案件列表、中间对话、右侧案件面板。所有业务状态都从服务端重新读取。
 import { api, post, errorText } from "/static/api.js";
 import { el, $, formatTime } from "/static/dom.js";
-import { statusPill, statusTone } from "/static/labels.js";
+import { statusLabel, statusPill, statusTone } from "/static/labels.js";
 import { state, runTask } from "/static/store.js";
 import { renderCaseDetails } from "/static/case-details.js";
 import { renderTrace, streamMessage, stepLabel } from "/static/trace.js";
@@ -66,6 +66,18 @@ function selectTab(tab) {
 }
 
 // —— 消息 ——
+// 页面按钮会以固定指令记录到对话中（如“提交申请 CONF-…”），显示时换成易读文字，编号保留为小字。
+const commands = { 确认方案: "确认此版本方案", 取消方案: "取消此方案", 提交申请: "提交退货申请", 确认换货: "确认换货方案", 恢复案件: "继续办理此案件" };
+const COMMAND = /^(确认方案|取消方案|提交申请|确认换货|恢复案件) (\S+)(?: (v\d+))?$/;
+
+function messageText(message) {
+  const match = message.role === "user" && COMMAND.exec(message.content.trim());
+  if (!match) return el("p", message.content);
+  const text = el("p", commands[match[1]]);
+  text.append(el("small", ` ${match[2]}${match[3] ? " · " + match[3] : ""}`, "command-ref"));
+  return text;
+}
+
 function messageNode(message, extraClass = "", cardContext = null) {
   const user = message.role === "user";
   const article = el("article", undefined, `message ${user ? "user" : "assistant"} ${extraClass}`.trim());
@@ -74,7 +86,7 @@ function messageNode(message, extraClass = "", cardContext = null) {
   const time = formatTime(message.created_at);
   if (time) meta.append(el("time", time));
   const bubble = el("div", undefined, "bubble");
-  bubble.append(el("p", message.content));
+  bubble.append(messageText(message));
   article.append(meta, bubble);
   const card = cardContext && renderCard(message.card, cardContext);
   if (card) article.append(card);
@@ -181,17 +193,29 @@ function renderLists(cases, exchanges, tickets, activeCaseId) {
 }
 
 // —— 对话头部与右侧面板 ——
-function renderHeader(conversation, cases, progress) {
+function renderHeader(conversation, cases, progress, exchange, ticket) {
+  // 与右侧面板同一焦点：查看换货或工单时，标题和状态也跟随它，而不是显示“尚未关联案件”。
+  const focus = state.customer.focus;
   const active = cases.find(item => item.case_id === conversation.case_id);
-  $("#chat-title").textContent = active?.product_name ? `${active.product_name} · 售后办理` : "售后对话";
-  $("#active-case").textContent = conversation.case_id
-    ? `${active?.order_id ? active.order_id + " · " : ""}案件 ${conversation.case_id}`
-    : "新对话，尚未关联案件";
+  let title = active?.product_name ? `${active.product_name} · 售后办理` : "售后对话";
+  let subtitle = conversation.case_id ? `${active?.order_id ? active.order_id + " · " : ""}案件 ${conversation.case_id}` : "新对话，尚未关联案件";
+  let current = progress && { status: progress.status, label: progress.status_label };
+  if (focus === "exchange" && exchange) {
+    title = `${exchange.snapshot.product_name} · 换货`;
+    subtitle = `${exchange.snapshot.order_id} · 换货申请 ${exchange.id}`;
+    current = { status: exchange.status, label: exchange.status_label };
+  } else if (focus === "ticket" && ticket) {
+    title = "人工工单";
+    subtitle = ticket.id;
+    current = { status: ticket.status, label: statusLabel(ticket.status) };
+  }
+  $("#chat-title").textContent = title;
+  $("#active-case").textContent = subtitle;
   const pill = $("#chat-status-pill");
-  pill.hidden = !progress;
-  if (progress) {
-    pill.className = `pill tone-${statusTone(progress.status)}`;
-    pill.textContent = progress.status_label;
+  pill.hidden = !current;
+  if (current) {
+    pill.className = `pill tone-${statusTone(current.status)}`;
+    pill.textContent = current.label;
   }
 }
 
@@ -240,7 +264,7 @@ export async function refreshConversation() {
   const exchange = exchanges.find(item => item.id === state.customer.exchange) || null;
   if (!exchange) state.customer.exchange = null;
   renderMessages(conversation.messages, progress);
-  renderHeader(conversation, cases, progress);
+  renderHeader(conversation, cases, progress, exchange, ticket);
   renderLists(cases, exchanges, tickets, conversation.case_id);
   renderPanel(progress, exchange, ticket);
   state.ready.customer = true;

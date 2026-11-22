@@ -42,7 +42,7 @@ def request_view(row, connection) -> dict:
     result["return_conditions_met"] = result["status"] == "ready_for_refund" and return_conditions_met(result["return_events"])
     result["status_label"], result["next_step"] = {
         "pending_approval": ("待审批", "等待客服审核，尚未批准，不能退款，请勿寄回。"),
-        "awaiting_return": ("待退货", "可提交演示承运商和退货单号，请勿实际寄件。后续需仓库签收、检验通过后才能退款。"),
+        "awaiting_return": ("待寄回", "可提交演示承运商和退货单号，请勿实际寄件。后续需仓库签收、检验通过后才能退款。"),
         "in_transit": ("退货运输中", "已登记退货单号，等待仓库签收，尚未满足退款条件。"),
         "awaiting_inspection": ("待检验", "仓库已签收，等待检验结果，尚未满足退款条件。"),
         "ready_for_refund": ("检验通过，待退款", "退回收货与检验条件已满足；退款前仍需核验授权和金额，尚未退款。"),
