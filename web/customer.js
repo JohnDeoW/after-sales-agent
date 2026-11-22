@@ -9,14 +9,16 @@ import { renderTicketDetails } from "/static/support.js";
 import { renderWarehouseDetails } from "/static/event-controls.js";
 import { renderCard } from "/static/cards.js";
 
-// 示例诉求只填入输入框，不自动发送。
+// 示例诉求只填入输入框，不自动发送；字母对应欢迎页“演示导览”中的场景。
 const prompts = [
-  ["退 1 根数据线", "订单ORD-DEMO-002退1根数据线，买错了，未拆封。"],
-  ["质量问题退耳机", "订单ORD-DEMO-004耳机无法开机，质量原因退1件，已经拆封。"],
-  ["咨询退货期限", "订单ORD-DEMO-001普通退货几天内能退？"],
-  ["查询物流", "查询物流 ORD-DEMO-008"],
-  ["同款换货", "订单ORD-DEMO-002的ITEM-002键盘换1件，目标规格黑色，原因是想换颜色。"],
-  ["转人工", "转人工"],
+  ["A 退 1 根数据线", "订单ORD-DEMO-002退1根数据线，买错了，未拆封。"],
+  ["B 质量问题退耳机", "订单ORD-DEMO-004耳机无法开机，质量原因退1件，已经拆封。"],
+  ["C 退鼠标", "订单ORD-DEMO-001退1件，不需要了，未拆封。"],
+  ["D 同款换货", "订单ORD-DEMO-002的ITEM-002键盘换1件，目标规格黑色，原因是想换颜色。"],
+  ["E 咨询退货期限", "订单ORD-DEMO-001普通退货几天内能退？"],
+  ["E 以旧换新", "订单ORD-DEMO-001的鼠标能以旧换新吗？"],
+  ["F 查询物流", "查询物流 ORD-DEMO-008"],
+  ["F 转人工", "转人工"],
 ];
 
 const layout = $("#customer-workspace");
@@ -115,7 +117,7 @@ function renderMessages(messages, progress) {
       progress, isLatest: message.id === latest, isNewest: !key || newestCard.get(key) === message.id, act: cardActions }));
   }
   if (!messages.length) {
-    messageList.append(el("p", "你好，我是售后助手。请描述你的售后诉求，例如订单号、商品和原因；也可以从左侧打开已有案件继续办理。", "empty"));
+    messageList.append(el("p", "你好，我是售后助手。请描述你的售后诉求，例如订单号、商品和原因；也可以从案件列表打开已有案件继续办理。", "empty"));
   }
   messageList.scrollTop = messageList.scrollHeight;
 }
@@ -349,7 +351,7 @@ export function initCustomer() {
     resetCustomerView();
     state.customer = { focus: "case", ticket: null, exchange: null };
     await refreshConversation();
-    statusLine.textContent = "已开启新对话，原案件仍可从左侧恢复。";
+    statusLine.textContent = "已开启新对话，原案件仍可从案件列表恢复。";
     input.focus();
   }));
   $("#tab-case").addEventListener("click", () => selectTab("case"));

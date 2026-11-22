@@ -188,11 +188,37 @@ function ticketHistory(ticket) {
   return history;
 }
 
+const handoffReasons = { no_answer: "检索到的条款未覆盖所问事项", no_match: "没有检索到可靠的政策依据", policy_conflict: "同等适用的条款版本存在冲突",
+  insufficient_information: "补充后仍缺少确定适用政策的信息", unavailable: "政策索引不可用" };
+
+// 政策咨询转人工：保留咨询问题、转交原因、检索与改写重查情况，以及需要核对的条款。
+function policyEvidence(evidence) {
+  const result = evidence.search_result || {};
+  const box = el("div", undefined, "policy-evidence");
+  box.append(el("p", `咨询问题（检索问法）：${evidence.question}`));
+  const lines = el("ul", undefined, "plain-list");
+  lines.append(el("li", `转交原因：${handoffReasons[evidence.reason] || evidence.reason}`));
+  lines.append(el("li", `检索次数：${evidence.search_attempts || 1}${evidence.requery ? `，已改写问法重查（“${evidence.requery}”）` : ""}`));
+  const retrieval = result.retrieval;
+  if (retrieval?.threshold != null) {
+    lines.append(el("li", `最高重排得分 ${retrieval.best_score == null ? "无" : retrieval.best_score.toFixed(2)}，判定阈值 ${retrieval.threshold.toFixed(2)}`));
+  }
+  box.append(lines);
+  const clauses = [...(result.policies || []), ...(result.conflicts || []).flat()];
+  if (clauses.length) {
+    const list = el("ul", undefined, "plain-list");
+    for (const clause of clauses) list.append(el("li", `${clause.clause_id} / ${clause.version} · ${clause.title}`));
+    box.append(el("p", result.conflicts?.length ? "存在冲突的条款版本：" : "待核对条款：", "muted"), list);
+  } else box.append(el("p", "没有可作为依据的条款；如政策确未覆盖，应如实答复客户，不编造结论。", "muted"));
+  return box;
+}
+
 function ticketEvidence(ticket) {
   const snapshot = ticket.snapshot;
   const evidence = snapshot.evidence || {};
   const facts = el("div");
   facts.append(orderEvidence(snapshot.order || evidence.order));
+  if (ticket.source === "policy_review" && evidence.question) facts.append(policyEvidence(evidence));
   for (const text of [evidence.customer_statement, evidence.statement, evidence.original_message, snapshot.case?.summary]) {
     if (text) facts.append(el("p", text, "quote"));
   }

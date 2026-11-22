@@ -24,7 +24,23 @@
     <div class="welcome-copy">
       <p class="eyebrow">AFTER-SALES AGENT</p>
       <h1>选择一个演示身份开始</h1>
-      <p>客户发起售后诉求，客服审批与跟进工单，仓库登记收货、检验与换新发货。</p>
+      <p>客户发起售后诉求，客服审批与跟进工单，仓库登记收货、检验与换新发货。每轮对话都可在“运行轨迹”中查看 LangGraph 节点、模型与工具调用和政策检索得分。</p>
+      <h2 class="tour-title">演示导览</h2>
+      <ol class="tour">
+        <li><strong>A 普通退货退款</strong><span class="tour-roles">客户 → 仓库 → 客户</span>
+          <p>示例诉求“退 1 根数据线”：确认方案、提交申请、寄回，仓库签收检验后模拟退款 33.33 元。</p></li>
+        <li><strong>B 质量问题审批</strong><span class="tour-roles">客户 → 客服 → 仓库</span>
+          <p>“质量问题退耳机”：方案需客服审批，批准后按 A 寄回检验，退款 699 元。</p></li>
+        <li><strong>C 退款超时核对</strong><span class="tour-roles">客户 → 客服演示控制</span>
+          <p>“退鼠标”走到待退款，客服把退款设为“成功但响应超时”；客户核对原结果，不会重复退款。</p></li>
+        <li><strong>D 同款换货</strong><span class="tour-roles">客户 → 仓库</span>
+          <p>“同款换货”：键盘白换黑，确认时预留库存，仓库签收、检验、换新发货与送达。</p></li>
+        <li><strong>E 政策咨询与拒答</strong><span class="tour-roles">客户</span>
+          <p>“咨询退货期限”给出引用条款；“以旧换新”是政策未覆盖的问题，应说明限制并转人工。</p></li>
+        <li><strong>F 物流与人工工单</strong><span class="tour-roles">客户 → 客服</span>
+          <p>“查询物流”看延迟件，“转人工”生成工单，客服在待办中回复。</p></li>
+      </ol>
+      <p class="muted tour-tip">客户页输入框上方的示例诉求按钮对应以上场景；完整步骤见测试指南。</p>
     </div>
     <div id="identity-slot"></div>
   </section>
@@ -54,6 +70,10 @@
       <a href="/?role=support" target="_blank" rel="noopener">客服</a>
       <a href="/?role=warehouse" target="_blank" rel="noopener">仓库</a>
       <small>每个标签页保留各自的身份，互不登出。</small></p>
+    <div class="demo-reset">
+      <button id="reset-demo" type="button" class="secondary small">准备全新演示数据</button>
+      <small>清空全部案件、退款、对话与登录会话，按今天重新生成演示订单；仅限运行服务的本机。</small>
+    </div>
     <p id="identity-error" class="error" role="alert" hidden></p>
     <button id="reload-identities" type="button" class="secondary" hidden>重新加载</button>
   </div>
@@ -138,7 +158,7 @@
       </aside>
       <div class="staff-main">
         <p id="support-error" class="error" role="alert" hidden></p>
-        <section id="support-details" class="detail work-detail"><p class="empty">从左侧列表选择申请或工单，查看证据后处理。</p></section>
+        <section id="support-details" class="detail work-detail"><p class="empty">从待办列表选择申请或工单，查看证据后处理。</p></section>
       </div>
     </section>
 

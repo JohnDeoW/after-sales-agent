@@ -1,11 +1,11 @@
-// 运行轨迹：展示节点、模型与工具调用、耗时、token 和政策引用；不包含提示词、密钥或思维链。
+// 运行轨迹：展示节点、模型与工具调用、耗时、token、检索命中与得分和政策引用；不包含提示词、密钥或思维链。
 import { el } from "/static/dom.js";
 import { roleHeaders } from "/static/api.js";
 import { statusLabel } from "/static/labels.js";
 
 const labels = {
   load_context: "读取当前案件", route_command: "检查明确操作", prepare_context: "准备必要上下文",
-  recognize: "识别诉求", IntakeUpdate: "理解本轮信息", PolicyAnswer: "依据条款组织解释",
+  recognize: "识别诉求", IntakeUpdate: "理解本轮信息", PolicyAnswer: "依据条款组织解释", PolicyRequery: "改写问法重查",
   select_read_tool: "选择查询", read_tool: "读取业务事实", collect_information: "检查缺失信息",
   evaluate_rules: "校验资格和金额", proposal: "保存方案", clarify: "补问必要信息",
   persist_turn: "保存本轮结果", confirm: "核对方案确认", cancel: "取消办理",
@@ -39,6 +39,44 @@ const failureNames = { timeout: "响应超时", connection: "连接失败", rate
   output_format: "输出格式无效" };
 
 const label = name => labels[name] || name;
+const sources = { clause: "条款", handbook: "政策手册", faq: "常见问答" };
+const score = value => value == null ? "—" : Number(value).toFixed(2);
+
+// 政策检索：两路检索器（BM25 / 向量）的得分、交叉编码器重排得分与“无依据”阈值，以及最终采用了哪些条款。
+function retrievalView(retrieval) {
+  const wrap = el("div", undefined, "retrieval");
+  const { best_score: best, threshold } = retrieval;
+  if (threshold != null) {
+    const reliable = best != null && best >= threshold;
+    const verdict = el("p", undefined, `retrieval-verdict tone-${reliable ? "ok" : "human"}`);
+    verdict.textContent = best == null ? "没有检索到候选条款，判定为无可靠依据。"
+      : `最高重排得分 ${score(best)}，阈值 ${score(threshold)}：${reliable ? "有可靠依据" : "无可靠依据（不据此回答）"}`;
+    wrap.append(verdict);
+  }
+  if (!retrieval.candidates?.length) return wrap;
+  const scroller = el("div", undefined, "table-scroll");
+  const table = el("table", undefined, "retrieval-table");
+  const head = el("tr");
+  for (const name of ["候选条款", "BM25", "向量", "重排", "采用"]) head.append(el("th", name));
+  table.append(el("thead"), el("tbody"));
+  table.tHead.append(head);
+  for (const c of retrieval.candidates) {
+    const row = el("tr", undefined, c.used ? "used" : "");
+    const name = el("td");
+    const [source] = String(c.matched || "").split(":");
+    name.append(el("strong", c.chunk_id), el("small", `${c.title} · 经${sources[source] || source || "条款"}命中`));
+    const below = threshold != null && c.rerank_score != null && c.rerank_score < threshold;
+    const mark = el("td", c.used ? "✓" : below ? "✕" : "—");
+    mark.title = c.used ? "采用为依据" : below ? "重排得分低于阈值" : "未采用（排名靠后或不适用）";
+    row.append(name, el("td", score(c.bm25_score)), el("td", score(c.vector_score)),
+      el("td", score(c.rerank_score), below ? "below" : ""), mark);
+    table.tBodies[0].append(row);
+  }
+  scroller.append(table);
+  wrap.append(scroller, el("p", "BM25 与向量为两路检索器各自的得分（“—”表示该路未命中），两路按 RRF 融合后由交叉编码器重排；"
+    + "✓ 为采用的依据，✕ 为重排得分低于阈值；采用前还需通过商品、下单日期与原因的适用性过滤。", "muted trace-note"));
+  return wrap;
+}
 let phoenixUrl = null;
 fetch("/observability").then(response => response.ok ? response.json() : {}).then(data => { phoenixUrl = data.phoenix_url || null; }).catch(() => {});
 const resultLabel = value => results[value] || statusLabel(value);
@@ -82,6 +120,7 @@ function eventNode(event, maxDuration, shownCitations) {
   const summary = el("summary");
   const meta = el("span", undefined, "trace-meta");
   meta.append(el("span", kindName, "trace-kind"), el("span", eventStatus[event.status] || event.status, "trace-state"));
+  if (event.via === "mcp") meta.append(el("span", "经 MCP", "trace-via"));
   if (event.duration_ms != null) meta.append(el("span", ms(event.duration_ms)));
   const bar = el("span", undefined, "trace-bar");
   bar.style.setProperty("--w", `${Math.max(2, Math.round(((event.duration_ms || 0) / maxDuration) * 100))}%`);
@@ -109,6 +148,7 @@ function eventNode(event, maxDuration, shownCitations) {
       ? result.selected_tools.map(call => [label(call.name), Object.entries(call.args || {}).map(([k, v]) => `${argNames[k] || k} ${v}`).join("，") || "无参数"])
       : [["结果", "未选择工具"]]));
   }
+  if (result.retrieval) box.append(el("h4", "检索命中与重排"), retrievalView(result.retrieval));
   if (event.attempts > 1) box.append(el("p", `临时失败后重试，共尝试 ${event.attempts} 次。`, "muted trace-note"));
   const metrics = event.model_metrics;
   if (metrics) {
@@ -135,7 +175,7 @@ function eventNode(event, maxDuration, shownCitations) {
     el("pre", JSON.stringify({ kind: event.kind, name: event.name, args: event.args, result: event.result }, null, 2)));
   box.append(raw);
   // 补问、引用政策或失败的步骤默认展开，直接看出“为何补问、依据什么、在哪失败”。
-  box.open = event.status === "error" || Boolean(result.missing_fields?.length || fresh.length);
+  box.open = event.status === "error" || Boolean(result.missing_fields?.length || fresh.length || result.retrieval);
   item.append(box);
   return item;
 }
@@ -155,11 +195,14 @@ export function renderTrace(value, progress = null) {
   const top = el("div", undefined, "trace-summary-top");
   top.append(el("strong", "本轮运行"), el("span", value.status ? resultLabel(value.status) : "处理中", `pill tone-${runTone(value.status)}`));
   const usage = value.usage || {};
+  const limits = value.limits || {};
+  const budget = (used, max) => max ? `${used} / ${max}` : String(used);
   const counts = { node: 0, model: 0, tool: 0 };
   for (const event of events) counts[event.kind] = (counts[event.kind] || 0) + 1;
   const stats = el("div", undefined, "trace-stats");
   for (const [name, number] of [["总耗时", value.duration_ms == null ? "…" : ms(value.duration_ms)],
-    ["流程节点", usage.steps ?? counts.node], ["模型调用", usage.model_calls ?? counts.model], ["工具调用", usage.tool_calls ?? counts.tool],
+    ["流程节点", usage.steps ?? counts.node], ["模型调用（上限）", budget(usage.model_calls ?? counts.model, limits.max_model_calls)],
+    ["工具调用（上限）", budget(usage.tool_calls ?? counts.tool, limits.max_tool_calls)],
     ["输入 token", usage.tokens?.input_tokens ?? "—"], ["输出 token", usage.tokens?.output_tokens ?? "—"]]) {
     const stat = el("div", undefined, "trace-stat");
     stat.append(el("span", String(number)), el("small", name));

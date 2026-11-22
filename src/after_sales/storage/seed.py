@@ -107,6 +107,22 @@ def initialize_demo(as_of: date, path: Path | None = None, *, reset: bool = Fals
     return True
 
 
+def reset_demo_in_place(path: Path, as_of: date) -> None:
+    """服务运行中重置演示库：在同一文件内删表重建（Windows 下运行中的库文件不能删除），
+    清空案件、退款、会话、检查点等全部记录后按 as_of 重新生成演示数据。"""
+    from after_sales.storage.database import initialize_session_storage
+    with connect_database(path) as connection:
+        connection.execute("PRAGMA foreign_keys = OFF")
+        tables = [row[0] for row in connection.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")]
+        for table in tables:
+            connection.execute(f'DROP TABLE "{table}"')
+    with connect_database(path) as connection:
+        connection.executescript("BEGIN;\n" + SCHEMA_PATH.read_text(encoding="utf-8"))
+        seed_demo(connection, as_of)
+    initialize_session_storage(path)
+
+
 def run() -> None:
     parser = argparse.ArgumentParser(description="初始化演示库（默认 data/demo.sqlite3）；已存在时保留原数据，--reset 时重建。")
     parser.add_argument(

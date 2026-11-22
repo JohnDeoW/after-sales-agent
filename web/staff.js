@@ -54,7 +54,7 @@ export async function refreshSupport() {
   renderFilters(lastSupportItems);
   renderQueue();
   const root = $("#support-details");
-  if (!data) root.innerHTML = emptyDetail("从左侧列表选择申请或工单，查看证据后处理。");
+  if (!data) root.innerHTML = emptyDetail("从待办列表选择申请或工单，查看证据后处理。");
   else if (selected.type === "approval") renderApprovalDetails(root, data, performSupportAction);
   else renderTicketDetails(root, data, performSupportAction);
   root.hidden = false;
@@ -192,7 +192,7 @@ export function resetStaffView() {
   supportFilter = "all";
   lastSupportItems = [];
   for (const id of ["#support-queue", "#support-filters", "#event-queue", "#warehouse-board", "#warehouse-other-list"]) $(id).replaceChildren();
-  $("#support-details").innerHTML = emptyDetail("从左侧列表选择申请或工单，查看证据后处理。");
+  $("#support-details").innerHTML = emptyDetail("从待办列表选择申请或工单，查看证据后处理。");
   $("#event-details").hidden = false;
   $("#event-details").innerHTML = emptyDetail("选择申请，查看当前状态及可设置的退款模拟场景。");
   for (const id of ["#support-error", "#event-error", "#warehouse-error"]) $(id).hidden = true;

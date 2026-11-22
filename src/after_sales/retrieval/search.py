@@ -100,11 +100,12 @@ def _merge_queries(results: dict) -> dict:
 
 def _evidence_threshold(results: dict, threshold: float) -> dict:
     """重排得分低于阈值的候选不作为依据；全部低于阈值即“无依据”（向量检索总会返回近邻，不能据此回答）。"""
-    scores = [c["retrieval"]["rerank_score"] for c in results["candidates"] if "rerank_score" in c["retrieval"]]
+    ranked = results["candidates"]
+    scores = [c["retrieval"]["rerank_score"] for c in ranked if "rerank_score" in c["retrieval"]]
     if not scores:
-        return {**results, "best_score": None}
-    kept = [c for c in results["candidates"] if c["retrieval"]["rerank_score"] >= threshold]
-    return {**results, "candidates": kept, "best_score": max(scores)}
+        return {**results, "ranked": ranked, "best_score": None, "threshold": None}
+    kept = [c for c in ranked if c["retrieval"]["rerank_score"] >= threshold]
+    return {**results, "candidates": kept, "ranked": ranked, "best_score": max(scores), "threshold": threshold}
 
 
 def _apply_applicability(results: dict, all_chunks: list[dict]) -> dict:
@@ -130,9 +131,15 @@ def _conflict_check(results: dict) -> dict:
     missing = results["missing"]
     # 缺少必要条件时不把某个版本作为默认办理依据返回。
     status = "conflict" if conflicts else ("clarification_needed" if missing else ("ok" if results["policies"] else "no_match"))
-    return {"status": status, "missing_fields": sorted(missing),
-            "policies": results["policies"][:5] if status == "ok" else [], "conflicts": conflicts,
-            "best_score": results.get("best_score"),
+    policies = results["policies"][:5] if status == "ok" else []
+    used = {p["chunk_id"] for p in policies}
+    # 检索过程摘要（候选条款、各路得分、是否采用），供页面轨迹与 Phoenix 讲解；不含条款正文。
+    retrieval = {"best_score": results.get("best_score"), "threshold": results.get("threshold"),
+                 "candidates": [{"chunk_id": c["chunk_id"], "title": c["title"], "used": c["chunk_id"] in used,
+                                 **{k: v for k, v in c["retrieval"].items() if k != "rrf"}}
+                                for c in results.get("ranked", [])[:8]]}
+    return {"status": status, "missing_fields": sorted(missing), "policies": policies, "conflicts": conflicts,
+            "best_score": results.get("best_score"), "retrieval": retrieval,
             "context": {key: results.get(key) for key in ("sku", "ordered_on", "reason_kind")}}
 
 
@@ -192,7 +199,7 @@ def search_policy(question: str, *, sku: str | None = None, ordered_on: str | No
     context = {"sku": sku, "ordered_on": ordered_on, "reason_kind": reason_kind}
     if not index_path.is_file():
         return {"status": "unavailable", "missing_fields": [], "policies": [], "conflicts": [], "best_score": None,
-                "context": context}
+                "retrieval": None, "context": context}
     resources = load_resources(index_path)
     chain = build_chain(resources, mode, vector_filter(context, resources["catalog"]), threshold)
     message = user_message if user_message and user_message.strip() != question.strip() else None

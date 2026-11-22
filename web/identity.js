@@ -93,4 +93,21 @@ export function initIdentity(onLogin, onReload) {
   $("#switch-identity").addEventListener("click", openDialog);
   $("#close-identity").addEventListener("click", () => dialog.close());
   $("#reload-identities").addEventListener("click", onReload);
+  $("#reset-demo").addEventListener("click", async () => {
+    if (state.busy) return;
+    if (!confirm("将清空全部案件、退款、对话记录和所有标签页的登录会话，并按今天重新生成演示订单。确定继续吗？")) return;
+    setBusy(true);
+    error.hidden = true;
+    status.textContent = "正在重置演示数据…";
+    try {
+      const { as_of } = await post("/demo/reset", {});
+      status.textContent = `已按 ${as_of} 重新生成演示数据，请重新选择身份。`;
+      // 原有会话已全部失效：回到欢迎页重新登录；其他标签页刷新后同样需要重新选择身份。
+      setTimeout(() => location.reload(), 800);
+    } catch (failure) {
+      showIdentityError(failure);
+      status.textContent = "重置未完成。";
+      setBusy(false);
+    }
+  });
 }

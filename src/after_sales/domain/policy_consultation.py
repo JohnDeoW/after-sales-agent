@@ -23,7 +23,7 @@ def _handoff(context: dict, reason: str, message: str, evidence: dict | None = N
     context["handoff"] = {
         "reason": reason, "message": message, "question": context["question"],
         "known_fields": {k: context[k] for k in ("order_id", "item", "sku", "ordered_on", "reason_kind") if k in context},
-        "search_attempts": context.get("search_attempts", 0), "ticket_created": False,
+        "search_attempts": context.get("search_attempts", 0), "requery": context.get("requery"), "ticket_created": False,
         "evidence": evidence,
         "policy_refs": [{k: p[k] for k in ("chunk_id", "clause_id", "version", "source_sha256")} for p in clauses],
     }
