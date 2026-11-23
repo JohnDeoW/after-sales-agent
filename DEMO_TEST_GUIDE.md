@@ -13,7 +13,6 @@
 | `src/after_sales/domain/demo_rules.json` | 政策原文、适用范围和结构化规则的来源 |
 | `data/demo.sqlite3` | `after-sales-api` 默认使用的业务库 |
 | `data/policy_index.sqlite3`、`data/policy_index-vectors/` | 政策索引（条款快照与本地向量），由 `after-sales-policy-index rebuild` 生成 |
-| `data/p5-*.sqlite3` | 以前演示用过的库，已有办理记录，不能当作全新样例 |
 | `evals/scenarios.json`、`evals/replay.py` | 统一回放样例与入口；每次回放另建独立数据库 |
 | `artifacts/` | 回放生成的结果和数据库，不是默认业务库 |
 

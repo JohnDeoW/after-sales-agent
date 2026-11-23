@@ -1,5 +1,5 @@
 """统一评测入口：场景回放（离线预设 / 真实模型）、检索评测（retrieval，不调用模型）与回答忠实度评测
-（faithfulness，调用真实模型），分别保存机器结果。"""
+（faithfulness，调用真实模型）与模拟真人情景测试（realistic，模型扮演顾客与真实系统多轮对话），分别保存机器结果。"""
 
 import argparse
 import csv
@@ -137,7 +137,7 @@ def finish_refund(client, request, proposal, scenario, result):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--mode", choices=["offline", "live", "retrieval", "faithfulness"], default="offline")
+    parser.add_argument("--mode", choices=["offline", "live", "retrieval", "faithfulness", "realistic"], default="offline")
     parser.add_argument("--select", default="core", help="core / all / 组名 / 场景ID，多个值用逗号分隔；holdout为独立检查组")
     parser.add_argument("--list", action="store_true")
     parser.add_argument("--query", choices=["original", "rewritten", "combined", "all"], default="all",
@@ -153,6 +153,8 @@ def main():
         return run_retrieval(args)
     if args.mode == "faithfulness":
         return run_faithfulness(args)
+    if args.mode == "realistic":
+        return run_realistic(args)
     scenarios = json.loads(Path(__file__).with_name("scenarios.json").read_text(encoding="utf-8"))
     if args.list:
         for s in scenarios: print(s["id"], s["group"])
@@ -233,6 +235,47 @@ def run_faithfulness(args) -> int:
     report = evaluate_faithfulness(settings, cases, index, args.retriever)
     (directory / "results.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(report["summary"], ensure_ascii=False))
+    release_vector_stores()
+    flush_traces()
+    if phoenix:
+        print("Phoenix：", phoenix)
+    print("机器结果：", directory)
+    return 0
+
+
+def run_realistic(args) -> int:
+    from after_sales.observability import flush as flush_traces, setup_tracing
+    from after_sales.retrieval.index import release_vector_stores
+    from realistic import load_cases, new_run_id, run_case, summarize, write_transcripts
+    cases = load_cases()
+    if args.list:
+        for c in cases: print(c["id"], "、".join(c["tags"]))
+        return 0
+    selectors = args.select.split(",")
+    selected = [c for c in cases if selectors in (["core"], ["all"]) or c["id"] in selectors]
+    if not selected: raise SystemExit("没有匹配的情景")
+    settings = load_settings()
+    phoenix = setup_tracing(settings)
+    directory = PROJECT_ROOT / "artifacts" / ("realistic-" + datetime.now().strftime("%Y%m%d-%H%M%S") + "-" + new_run_id())
+    directory.mkdir(parents=True)
+    index = directory / "policies.sqlite3"
+    rebuild_index(index_path=index)
+    results = []
+    for case in selected:
+        try:
+            result = run_case(case, settings, directory, index)
+        except Exception as exc:
+            # 单个情景失败不影响其他情景；不保存可能含密钥的异常原文。
+            result = {"id": case["id"], "tags": case["tags"], "passed": False, "outcome": "error", "customer_turns": 0,
+                      "repeated_replies": 0, "unexpected_handoff": False, "error": type(exc).__name__, "transcript": []}
+        results.append(result)
+        print(json.dumps({k: result.get(k) for k in ("id", "passed", "outcome", "customer_turns", "repeated_replies",
+                                                    "unexpected_handoff", "checks", "error")}, ensure_ascii=False), flush=True)
+        report = {"mode": "realistic", "model": settings.llm_model_id, "business_date": str(business_today()),
+                  "summary": summarize(results), "results": results}
+        (directory / "results.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+        write_transcripts(directory / "transcripts.md", results)
+    print(json.dumps(summarize(results), ensure_ascii=False))
     release_vector_stores()
     flush_traces()
     if phoenix:

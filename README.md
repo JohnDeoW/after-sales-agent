@@ -167,7 +167,20 @@ uv run python -X utf8 evals/replay.py --mode faithfulness
 uv run python -X utf8 evals/replay.py --mode faithfulness --limit 0
 ```
 
-输出忠实率、引用命中期望条款的比例、有依据问题被误拒的比例、无依据问题正确拒答的比例、改写重查的次数与挽回数，以及检索和回答的平均耗时。这项评测只在离线运行，不增加在线对话的模型调用。
+**模拟真人情景测试**（会调用真实模型并产生 API 消耗）：`evals/realistic_cases.json` 中每个情景写明一位顾客的性格与说话方式、他自己知道的事实（可能记不清订单号）和目标；由模型扮演这位顾客，只看“屏幕上”的回复、卡片和按钮，像真人一样说话或点按钮，与真实系统多轮对话（最多 8 轮），目标达成或不想再试时结束。每个情景用独立的新库，结束后按规则检查办理结果（方案、确认、申请、换货、工单、是否误退款），并统计轮数、是否放弃、意外转人工和重复回复。结果写入 `artifacts/realistic-…/results.json`，完整对话写入同目录的 `transcripts.md`。
+
+```powershell
+# 全部情景
+uv run python -X utf8 evals/replay.py --mode realistic --select all
+
+# 列出情景 / 只跑其中几个
+uv run python -X utf8 evals/replay.py --mode realistic --list
+uv run python -X utf8 evals/replay.py --mode realistic --select fault_only_no_order,typo_casual
+```
+
+顾客由模型扮演，同一情景多次运行的说法与结果会有差异，应看多次运行的整体情况。
+
+端到端回答评测输出忠实率、引用命中期望条款的比例、有依据问题被误拒的比例、无依据问题正确拒答的比例、改写重查的次数与挽回数，以及检索和回答的平均耗时。这项评测只在离线运行，不增加在线对话的模型调用。
 
 运行全部业务测试（pytest 统一入口，不调用模型、不发起网络请求，约 2—3 分钟；`tests/` 只在本地开发环境中保留，不随仓库发布）：
 

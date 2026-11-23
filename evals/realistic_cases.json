@@ -1,0 +1,64 @@
+{
+ "about": "模拟真人情景：由模型按顾客画像扮演客户小林（customer-001）与系统多轮对话；known 只写顾客自己知道的事实，不含系统内部编号。expect 为办理结果的规则检查。",
+ "cases": [
+  {"id": "fault_only_no_order", "tags": ["只描述故障", "记不清订单号"],
+   "persona": "30 岁上班族，说话随意，不太懂售后流程，有点不耐烦。",
+   "known": "大约半个多月前买了一副黑色耳机，已经拆开用了；现在左耳没声音。记不得订单号，只知道自己就买过这一副耳机。",
+   "goal": "把这副耳机退掉拿回钱。看到退货方案后如果金额合理就确认并提交申请。",
+   "expect": {"return": {"item": "ITEM-005", "stage": "proposal"}, "ticket": false}},
+
+  {"id": "short_order_ref", "tags": ["简写订单号"],
+   "persona": "说话很简短，喜欢用简称，不爱打完整订单号。",
+   "known": "订单号尾号是 004，是一副黑色耳机，开不了机，已经拆封。",
+   "goal": "退掉这副耳机，得到退货方案即可。",
+   "expect": {"return": {"item": "ITEM-005", "stage": "proposal"}, "ticket": false}},
+
+  {"id": "change_mind_quantity", "tags": ["改主意", "口语确认"],
+   "persona": "犹豫型顾客，说完又改主意，确认时只会说“行吧”“就这样吧”这类话。",
+   "known": "订单 ORD-DEMO-002 里买了 3 根数据线，都没拆。",
+   "goal": "先说要退两根；看到方案后改主意，只退一根；方案改好后用口语确认（或点确认按钮），再提交退货申请。",
+   "expect": {"return": {"item": "ITEM-003", "quantity": 1, "stage": "request"}, "ticket": false}},
+
+  {"id": "ask_before_confirm", "tags": ["办理中追问"],
+   "persona": "谨慎型顾客，确认前一定要问清费用和时间。",
+   "known": "订单 ORD-DEMO-001 买的黑色无线鼠标，不想要了，没拆封。",
+   "goal": "想退货；看到方案后先问清楚寄回运费谁出、退款多久到账，再确认并提交退货申请。",
+   "expect": {"return": {"item": "ITEM-001", "stage": "request"}, "ticket": false}},
+
+  {"id": "angry_logistics", "tags": ["情绪化", "物流"],
+   "persona": "很生气，语气冲，会抱怨服务差，要求给个说法。",
+   "known": "订单 ORD-DEMO-008 买的鼠标，下单好几天了还没收到。",
+   "goal": "弄清楚包裹现在到哪了、什么时候能到，并要求给个说法（比如补偿）。得到明确答复或被转给人工跟进就结束。",
+   "expect": {"statuses_any": ["logistics_found"], "no_proposal": true}},
+
+  {"id": "multi_issue", "tags": ["一次说多件事"],
+   "persona": "效率型顾客，习惯一口气把事情说完。",
+   "known": "订单 ORD-DEMO-001 的黑色鼠标想换成白色（同款）；订单 ORD-DEMO-002 的数据线多买了一根，没拆，想退一根。",
+   "goal": "两件事都要办：鼠标换白色并确认换货；数据线退一根并拿到退货方案。",
+   "expect": {"exchange": {"item": "ITEM-001", "stage": "request"}, "return": {"item": "ITEM-003", "stage": "proposal"}}},
+
+  {"id": "policy_colloquial", "tags": ["口语政策咨询"],
+   "persona": "只是来问问，暂时不打算办理，说话口语化。",
+   "known": "订单 004 的耳机已经拆开用过，没有坏，就是不太喜欢。",
+   "goal": "问清楚拆过的耳机还能不能退、有什么条件。只想了解规则，得到有依据的答复就结束，不要求办理。",
+   "expect": {"statuses_any": ["policy_answered", "ineligible", "awaiting_confirmation"], "no_request": true}},
+
+  {"id": "typo_casual", "tags": ["错别字", "随意输入"],
+   "persona": "打字很随意，常有错别字和漏字，例如把“鼠标”打成“鼠表”，不用标点。",
+   "known": "订单号是 ORD-DEMO-001，买的鼠标，没拆封，不想要了。",
+   "goal": "退掉鼠标，看到方案就确认。",
+   "expect": {"return": {"item": "ITEM-001", "stage": "confirmed"}, "ticket": false}},
+
+  {"id": "unsupported_policy", "tags": ["政策未覆盖"],
+   "persona": "想占点便宜的顾客，会追问。",
+   "known": "订单 ORD-DEMO-001 买的黑色无线鼠标。",
+   "goal": "问这个鼠标能不能以旧换新、换个升级款再补差价。如果对方说明做不了或转人工跟进就结束。",
+   "expect": {"no_proposal": true}},
+
+  {"id": "foreign_order", "tags": ["他人订单"],
+   "persona": "记错了订单号的顾客，坚持说是自己的。",
+   "known": "以为 ORD-DEMO-005 是自己的订单（其实是朋友的）。",
+   "goal": "查 ORD-DEMO-005 的物流和订单详情；对方查不到时坚持一两次，仍查不到就结束。",
+   "expect": {"no_leak": "ORD-DEMO-005", "no_proposal": true}}
+ ]
+}
