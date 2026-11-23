@@ -5,7 +5,7 @@ def select(value: dict, keys: tuple) -> dict:
     return {key: value[key] for key in keys if key in value}
 
 
-def build_context(context: dict, order: dict | None, proposal: dict | None) -> dict:
+def build_context(context: dict, order: dict | None, proposal: dict | None, orders: list[dict] | None = None) -> dict:
     state = context["state"]
     progress = context["progress"]
     compact_state = select(state, ("last_intent", "query_order_id", "logistics_order_id", "logistics_dispute", "exchange_request_id",
@@ -43,4 +43,6 @@ def build_context(context: dict, order: dict | None, proposal: dict | None) -> d
     return {"task": {"case_id": context["case_id"], "previous_intent": state.get("last_intent", "unknown")},
             "state": compact_state, "case_progress": compact_progress,
             "order": current_order, "proposal": current_proposal, "policy_refs": policy_refs,
+            # 本人订单摘要：用于把“黑色耳机”“004”“耳机那单”对应到订单与商品；后端仍逐一核对归属。
+            "orders": orders or [],
             "history": [{"role": m["role"], "content": m["content"][:1200]} for m in context["history"][-6:]]}

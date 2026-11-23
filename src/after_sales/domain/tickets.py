@@ -57,6 +57,16 @@ class TicketService:
         return self.read(session_id, ticket_id, support=True)
 
 
+def customer_ticket_text(ticket):
+    """面向客户的工单说明：只说明已转人工、如何跟进，不列出客服待办等内部信息。"""
+    label = {"open": "待客服处理", "in_progress": "客服处理中", "replied": "客服已回复", "resolved": "已解决"}[ticket["status"]]
+    replies = [u["reply"] for u in ticket.get("updates", []) if u["reply"]]
+    text = f"人工工单 {ticket['id']}，当前状态：{label}。"
+    if replies:
+        return text + "客服答复：" + replies[-1] + "。"
+    return text + "客服处理后会在这里答复，你也可以随时查询工单进度；工单本身不代表已退款或已办理。"
+
+
 def ticket_text(ticket):
     label = {"open": "待客服处理", "in_progress": "客服处理中", "replied": "客服已回复", "resolved": "已解决"}[ticket["status"]]
     text = f"人工工单 {ticket['id']}，当前状态：{label}。转交原因：{ticket['reason']}。"

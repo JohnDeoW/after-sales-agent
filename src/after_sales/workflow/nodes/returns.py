@@ -4,15 +4,34 @@ import json
 
 from langgraph.runtime import Runtime
 
-from after_sales.domain.intake_service import _result
+from after_sales.domain.intake_service import _result, locate_items
 from after_sales.domain.returns import evaluate_return, assessment_reply, assessment_status
 from after_sales.storage.intake import save_turn
+from after_sales.workflow.nodes.common import get_order
 from after_sales.workflow.state import State, TurnContext
 
 
+def locate_reply(purpose: str, description: str | None, hits: list[dict], matched: bool) -> str:
+    if matched:
+        return f"你的订单里有 {len(hits)} 件符合“{description}”的商品，请选择要{purpose}的是哪一件。"
+    prefix = f"没有在你已签收的订单中找到“{description}”。" if description else "不记得订单号也没关系。"
+    return prefix + f"请从下面选择要{purpose}的商品。"
+
+
 def collect_information(s: State, runtime: Runtime[TurnContext]) -> dict:
+    ctx = runtime.context
     state = s["context"]["state"]
-    result, fields = runtime.context.deps.intake.collect_return(state["draft"], s["update"], lambda _: s["lookup"])
+    result, fields = ctx.deps.intake.collect_return(state["draft"], s["update"], lambda _: s["lookup"])
+    if result["missing_fields"] == ["order_id"] and not state["draft"].get("order_id"):
+        # 没有订单号：按描述在本人已签收订单中找商品，唯一命中直接继续，否则给出带订单的候选卡片。
+        description = state["draft"].get("item")
+        hits, matched = locate_items(ctx.deps.customers.list_orders(ctx.session_id), description)
+        if matched and len(hits) == 1:
+            located = s["update"].model_copy(update={"order_id": hits[0]["order_id"], "item": hits[0]["id"]})
+            lookup = get_order(runtime, hits[0]["order_id"])
+            result, fields = ctx.deps.intake.collect_return(state["draft"], located, lambda _: lookup)
+        elif hits:
+            result = _result("collecting_information", locate_reply("退货", description, hits, matched), ["item"], items=hits)
     state["assessment"] = None
     return {"result": result, "case_fields": fields,
             "next": "evaluate_rules" if result["status"] == "ready_for_evaluation" else "clarify"}
@@ -75,9 +94,19 @@ def persist_turn(s: State, runtime: Runtime[TurnContext]) -> dict:
             "logistics_order_id": state.get("logistics_order_id")}, ensure_ascii=False, sort_keys=True)
         previous = state.get("clarification_budget", {})
         count = previous.get("count", 0) + 1 if previous.get("identity") == identity else 1
-        state["clarification_budget"] = {"identity": identity, "count": count}
+        offered = previous.get("offered", False) if previous.get("identity") == identity else False
+        state["clarification_budget"] = {"identity": identity, "count": count, "offered": offered}
+        last_reply = next((m["content"] for m in reversed(s["context"]["history"]) if m["role"] == "assistant"), None)
+        if last_reply and result["reply_text"].strip() == last_reply.strip():
+            # 同一句补问不原样重复，换个说法并说明还差什么。
+            result["reply_text"] = "还差一点信息才能继续：" + result["reply_text"]
         if count >= ctx.deps.limits.max_clarification_rounds:
-            result["failure_handoff"] = {"reason_code": "clarification_budget", "workflow": ctx.trace.view("stopped")}
+            if not offered:
+                # 补问到上限前先给用户选择，而不是直接停止办理转人工。
+                state["clarification_budget"]["offered"] = True
+                result["reply_text"] += "\n如果一时说不清，也可以回复“转人工”，由客服帮你核对。"
+            else:
+                result["failure_handoff"] = {"reason_code": "clarification_budget", "workflow": ctx.trace.view("stopped")}
     else:
         state.pop("clarification_budget", None)
     response = save_turn(ctx.deps.customers.db_path, ctx.session_id, ctx.user["id"], ctx.content,

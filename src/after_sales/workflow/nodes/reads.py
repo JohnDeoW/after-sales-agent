@@ -9,10 +9,10 @@ choose_tool 是按意图与已知编号选择工具的规则，既用于确定�
 from langgraph.runtime import Runtime
 
 from after_sales.domain.exchanges import exchange_text
-from after_sales.domain.intake_service import _result, _items_text
+from after_sales.domain.intake_service import _result, _items_text, order_choice_text
 from after_sales.domain.logistics import logistics_text
 from after_sales.domain.return_requests import request_text
-from after_sales.domain.tickets import ticket_text
+from after_sales.domain.tickets import customer_ticket_text
 from after_sales.tools.registry import READ_ONLY_TOOLS
 from after_sales.workflow.nodes.common import read
 from after_sales.workflow.state import State, TurnContext
@@ -105,13 +105,13 @@ def _order_result(value, state):
 
 RENDERERS = {
     "get_order": _order_result,
-    "list_orders": lambda value, state: _result("collecting_information", "请提供要查询的订单号。本人订单：" + _ids(value),
+    "list_orders": lambda value, state: _result("collecting_information", "你的订单有：" + order_choice_text(value) + "。请告诉我是哪一单（说商品或订单号都可以）。",
                                                 ["order_id"], orders=value),
     "get_logistics": _logistics_result,
     "get_exchange_request": lambda value, state: _result("exchange_request_found", exchange_text(value), exchange_request=value),
     "list_exchange_requests": lambda value, state: _result(
         "clarification_needed", "请指定换货申请编号：" + _ids(value) if value else "当前没有换货申请。", exchange_requests=value),
-    "get_ticket": lambda value, state: _result("ticket_found", ticket_text(value), ticket=value),
+    "get_ticket": lambda value, state: _result("ticket_found", customer_ticket_text(value), ticket=value),
     "list_tickets": lambda value, state: _result(
         "clarification_needed", "请指定工单编号：" + _ids(value) if value else "当前没有人工工单。", tickets=value),
     "get_case": lambda value, state: _result("case_found", value["summary"], case_progress=value),

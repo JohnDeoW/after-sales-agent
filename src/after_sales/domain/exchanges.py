@@ -202,7 +202,7 @@ def exchange_text(request):
 
 def collect_exchange(state, update, get_order, get_inventory):
     draft = state.setdefault("exchange", {})
-    if "order_id" in update.clear_fields or (update.order_id and draft.get("order_id") != update.order_id):
+    if "order_id" in update.clear_fields or (update.order_id and draft.get("order_id") and draft["order_id"] != update.order_id):
         draft.clear()
     # 只有已核实的商品被换成另一件时才清空其余字段；首次选定商品沿用已给出的数量和目标规格。
     if "item" in update.clear_fields or (update.item and draft.get("order_item_id") and draft.get("item") != update.item):
@@ -229,6 +229,9 @@ def collect_exchange(state, update, get_order, get_inventory):
         return _result("exchange_unavailable", "订单尚未签收，不能创建换货方案。可查询物流或联系人工。")
     quantity = draft.get("quantity")
     remaining = item["quantity"] - item["returned_quantity"]
+    if quantity is None and remaining == 1:
+        # 只剩 1 件可换时不再追问数量，方案中写明 1 件由用户核对。
+        quantity = draft["quantity"] = 1
     if quantity is None or quantity <= 0 or quantity > remaining:
         draft.pop("quantity", None)
         return _result("collecting_information", f"请提供换货数量，当前剩余可选数量为 {remaining} 件。", ["quantity"])

@@ -62,9 +62,10 @@ class CustomerService:
         with connect_database(self.db_path) as connection:
             user = _session_user(connection, session_id)
             rows = connection.execute(
-                "SELECT * FROM orders WHERE user_id = ? ORDER BY id", (user["id"],),
+                "SELECT id FROM orders WHERE user_id = ? ORDER BY id", (user["id"],),
             ).fetchall()
-            return [dict(row) for row in rows]
+            # 带上商品摘要，便于用户按商品选择订单、识别模型按描述或简写对应订单。
+            return [read_order(connection, row["id"]) for row in rows]
 
     def get_order(self, session_id: str, order_id: str) -> dict:
         with connect_database(self.db_path) as connection:

@@ -94,6 +94,8 @@ repair和quality_dispute收集order_id、原商品item、问题描述reason、�
 用户明确要人工时归human，直接转交已有信息，不继续要求先补齐维修或退货字段。
 材料只是用户提供的引用；未读取图片，不得把故障识别、责任鉴定或赔偿结论当作事实。
 context中的order和case_progress来自本轮数据库读取；proposal的金额只是方案预估。
+context.orders是本人订单摘要。用户没给完整订单号，但描述了商品（名称、颜色、规格）、说了简写或尾号（如“004”“4号那单”）或指代（“耳机那单”）时：在orders中唯一对应就填order_id与item（商品项id）；对应多个则order_id留空、item写商品描述，由后端列出候选；对应不上留空。order_id只能填orders里存在的编号，不能编造。
+正在办理退货或换货时，用户说不记得订单号、请你帮忙查或找订单，仍归原来的return或exchange，不归order_query。
 确认、取消和申请状态以case_progress及proposal为准，不能从旧消息、用户自述或摘要推定退款成功。
 history只保留当前案件切换后的最近消息，截断不代表用户撤销已记录的确认或取消。
 当前消息明确修改订单、商品或诉求时优先提取新值；不能把旧订单事实套到新订单。

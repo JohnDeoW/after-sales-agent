@@ -39,7 +39,8 @@ def build_card(result: dict) -> dict | None:
     if "item" in missing and result.get("items"):
         return {"type": "item_choice", "purpose": result.get("intent"), "items": [
             {"id": item["id"], "product_name": item["product_name"], "specification": item["specification"],
-             "remaining": item["quantity"] - item["returned_quantity"]} for item in result["items"]]}
+             "remaining": item["quantity"] - item["returned_quantity"],
+             "order_id": item.get("order_id"), "ordered_on": item.get("ordered_on")} for item in result["items"]]}
     if "target_specification" in missing and result.get("inventory"):
         return {"type": "spec_choice", "variants": [
             {"sku": v["sku"], "specification": v["specification"], "available": v["available"]}

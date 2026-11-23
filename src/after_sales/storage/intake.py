@@ -139,7 +139,7 @@ def save_turn(path: Path, session_id: str, user_id: str, content: str,
             save_state(connection, session_id, case_id, context["state"])
         handoff = result.get("handoff")
         if result.get("failure_handoff"):
-            from after_sales.domain.tickets import ticket_text
+            from after_sales.domain.tickets import customer_ticket_text
             failure = result.pop("failure_handoff")
             state = context["state"]
             known = {key: state.get(key) for key in ("draft", "exchange", "service_request", "logistics_order_id", "exchange_request_id")}
@@ -158,7 +158,10 @@ def save_turn(path: Path, session_id: str, user_id: str, content: str,
             ticket = created["ticket"]
             ticket["updates"] = [dict(r) for r in connection.execute("SELECT * FROM ticket_updates WHERE ticket_id = ? ORDER BY id", (ticket["id"],))]
             result.update(status="workflow_handoff", ticket=ticket, ticket_reused=created["reused"])
-            result["reply_text"] = "自动办理已停止，已有记录保留并转交人工。" + ticket_text(ticket)
+            result["reply_text"] = "抱歉，我这边没能确认清楚，已请人工客服接手，你已提供的信息都已保留。" + customer_ticket_text(ticket)
+            if case_id:
+                # 案件交给人工后状态随之改为“待人工处理”，不再显示等待用户补充。
+                connection.execute("UPDATE cases SET status = 'manual_review_required' WHERE id = ? AND user_id = ?", (case_id, user_id))
             if failure.get("write_check"):
                 checked = failure["write_check"]
                 result["write_check"] = checked
@@ -167,12 +170,15 @@ def save_turn(path: Path, session_id: str, user_id: str, content: str,
                                         if record else "原编号暂未查询到可确认记录，结果仍待人工核对；未重复执行写操作。")
         if result.get("service_handoff"):
             from after_sales.domain.handoffs import create_service_ticket
-            from after_sales.domain.tickets import ticket_text
+            from after_sales.domain.tickets import customer_ticket_text
             created = create_service_ticket(connection, user_id, case_id, result.pop("service_handoff"))
             ticket = created["ticket"]
             ticket["updates"] = [dict(r) for r in connection.execute("SELECT * FROM ticket_updates WHERE ticket_id = ? ORDER BY id", (ticket["id"],))]
             result.update(status="ticket_created", ticket=ticket, ticket_reused=created["reused"])
-            result["reply_text"] = ticket_text(ticket) + "材料仅作为引用保存，系统未进行图片识别或责任鉴定。"
+            result["reply_text"] = "已为你转接人工客服。" + customer_ticket_text(ticket)
+            if case_id and connection.execute("SELECT status FROM cases WHERE id = ?", (case_id,)).fetchone()["status"] in (
+                    "collecting_information", "awaiting_confirmation", "ineligible"):
+                connection.execute("UPDATE cases SET status = 'manual_review_required' WHERE id = ? AND user_id = ?", (case_id, user_id))
         if handoff or result["status"] == "policy_unavailable":
             if handoff:
                 identity = {key: handoff[key] for key in ("reason", "question", "known_fields", "policy_refs")}

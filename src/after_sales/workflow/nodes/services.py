@@ -4,16 +4,30 @@ from langgraph.runtime import Runtime
 
 from after_sales.domain.exchanges import collect_exchange
 from after_sales.domain.handoffs import collect_handoff
+from after_sales.domain.intake_service import _result, locate_items
 from after_sales.domain.policy_consultation import consult_policy
 from after_sales.tools.inventory import get_inventory
 from after_sales.workflow.nodes.common import get_order, model_step, read
+from after_sales.workflow.nodes.returns import locate_reply
 from after_sales.workflow.state import State, TurnContext
 
 
 def exchange(s: State, runtime: Runtime[TurnContext]) -> dict:
     def inventory(order_id, item_id):
         return read("get_inventory", get_inventory, {"order_id": order_id, "item_id": item_id})
-    return {"result": collect_exchange(s["context"]["state"], s["update"], lambda oid: get_order(runtime, oid), inventory)}
+    ctx = runtime.context
+    state, update = s["context"]["state"], s["update"]
+    result = collect_exchange(state, update, lambda oid: get_order(runtime, oid), inventory)
+    if result["missing_fields"] == ["order_id"] and not state.get("exchange", {}).get("order_id"):
+        # 没有订单号：按描述找商品，唯一命中直接继续，否则给出带订单的候选卡片。
+        description = state["exchange"].get("item")
+        hits, matched = locate_items(ctx.deps.customers.list_orders(ctx.session_id), description)
+        if matched and len(hits) == 1:
+            located = update.model_copy(update={"order_id": hits[0]["order_id"], "item": hits[0]["id"]})
+            result = collect_exchange(state, located, lambda oid: get_order(runtime, oid), inventory)
+        elif hits:
+            result = _result("collecting_information", locate_reply("换货", description, hits, matched), ["item"], items=hits)
+    return {"result": result}
 
 
 def service_handoff(s: State, runtime: Runtime[TurnContext]) -> dict:

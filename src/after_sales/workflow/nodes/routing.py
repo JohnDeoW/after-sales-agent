@@ -7,7 +7,7 @@ from pydantic import ValidationError
 
 from after_sales.agent.context import build_context
 from after_sales.agent.intake import IntakeUpdate, IntakeUnavailable
-from after_sales.domain.intake_service import match_order_item
+from after_sales.domain.intake_service import match_order_item, orders_summary, resolve_order_ref
 from after_sales.domain.proposals import ProposalNotFound
 from after_sales.storage.intake import load_context
 from after_sales.workflow.nodes.common import get_order, model_step
@@ -55,7 +55,10 @@ def _choice(m, s, rt):
     if intent not in ("return", "exchange"):
         return None
     if m[1] == "商品":
-        update = IntakeUpdate(intent=intent, item=m[2])
+        # 跨订单候选卡片：所选商品项所属的本人订单一并带上（不属于本人时为空，后续照常核对）。
+        owned = rt.context.deps.customers.list_orders(rt.context.session_id)
+        order_id = next((o["id"] for o in owned if any(i["id"] == m[2] for i in o["items"])), None)
+        update = IntakeUpdate(intent=intent, item=m[2], order_id=order_id)
     elif intent == "exchange":
         update = IntakeUpdate(intent="exchange", target_specification=m[2])
     else:
@@ -152,15 +155,25 @@ def recognize(s: State, runtime: Runtime[TurnContext]) -> dict:
     context = s["context"]
     content = ctx.content.strip()
 
+    owned = ctx.deps.customers.list_orders(ctx.session_id)
+
     def extract():
         try:
-            value = ctx.deps.extractor(ctx.content, build_context(context, s["current_order"], s["proposal"]))
+            value = ctx.deps.extractor(ctx.content, build_context(context, s["current_order"], s["proposal"], orders_summary(owned)))
             return IntakeUpdate.model_validate(value)
         except ValidationError:
             raise IntakeUnavailable("模型未返回有效的识别结果，本轮消息未保存，已有信息保留，请重试。") from None
 
     update = model_step("IntakeUpdate", extract)
     state = context["state"]
+    if update.order_id:
+        # “004”这类简写按本人订单号结尾数字唯一对应；对应不上的原样交给后续核对。
+        update = update.model_copy(update={"order_id": resolve_order_ref(update.order_id, [o["id"] for o in owned])})
+    working = state.get("last_intent") in ("return", "exchange")
+    known_order = state["draft"].get("order_id") or state.get("exchange", {}).get("order_id")
+    if update.intent == "order_query" and working and not update.order_id and not known_order:
+        # 办理退货/换货时说“帮我查一下订单”是在找要办理的那一单，不切换成订单查询。
+        update = update.model_copy(update={"intent": state["last_intent"]})
     if update.intent == "confirm_return" and state.get("last_intent") == "exchange":
         exchange = state.get("exchange", {})
         changed = bool(update.clear_fields) or any(

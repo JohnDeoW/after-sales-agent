@@ -1,5 +1,7 @@
 """合并退货字段、匹配商品和找出缺失信息；流程由 LangGraph 编排。"""
 
+import re
+
 from after_sales.agent.intake import IntakeUpdate
 
 
@@ -15,8 +17,9 @@ def _items_text(items: list[dict]) -> str:
                     for item in items)
 
 
-def match_order_item(items: list[dict], text: str | None) -> dict | None:
-    """仅在当前订单中唯一命中时选择商品，允许规格与名称换序。"""
+def match_order_item(items: list[dict], text: str | None, loose: bool = True) -> dict | None:
+    """仅在当前订单中唯一命中时选择商品，允许规格与名称换序。
+    loose：订单只有一件商品且描述与它有共同字（如错别字“鼠表”）时直接选中，方案仍需用户核对确认。"""
     query = "".join((text or "").split()).casefold()
     if not query:
         return items[0] if len(items) == 1 else None
@@ -29,7 +32,46 @@ def match_order_item(items: list[dict], text: str | None) -> dict | None:
         if (query == item["id"].casefold() or query in name + spec
                 or (remaining and remaining in name)):
             matches.append(item)
+    if not matches and loose and len(items) == 1:
+        only = items[0]
+        if set(query) & set((only["product_name"] + only["specification"]).casefold()):
+            return only
     return matches[0] if len(matches) == 1 else None
+
+
+def resolve_order_ref(ref: str | None, order_ids: list[str]) -> str | None:
+    """把“004”“4号订单”这类简写对应到本人订单号：结尾数字唯一相同时采用，否则原样交给后续核对。"""
+    if not ref or ref in order_ids:
+        return ref
+    digits = re.findall(r"\d+", ref)
+    if not digits:
+        return ref
+    hits = [i for i in order_ids if re.search(r"\d+$", i) and int(re.search(r"\d+$", i)[0]) == int(digits[-1])]
+    return hits[0] if len(hits) == 1 else ref
+
+
+def locate_items(orders: list[dict], text: str | None) -> tuple[list[dict], bool]:
+    """在本人已签收订单中按描述找商品：返回（候选商品，是否按描述命中）；没有命中时返回全部可选商品。"""
+    pool = [{**item, "order_id": order["id"], "ordered_on": order["ordered_on"]}
+            for order in orders if order["status"] == "delivered" for item in order["items"]
+            if item["quantity"] > item["returned_quantity"]]
+    if text:
+        hits = [item for item in pool if match_order_item([item], text, loose=False)]
+        if hits:
+            return hits, True
+    return pool, False
+
+
+def orders_summary(orders: list[dict]) -> list[dict]:
+    """给识别模型的本人订单摘要：编号、日期、状态与商品名称规格，不含金额等其他信息。"""
+    return [{"id": o["id"], "ordered_on": o["ordered_on"], "status": o["status"],
+             "items": [{"id": i["id"], "name": f"{i['product_name']} {i['specification']}"} for i in o["items"]]}
+            for o in orders]
+
+
+def order_choice_text(orders: list[dict]) -> str:
+    return "、".join(f"{o['id']}（{o['ordered_on']} 下单，" + "、".join(f"{i['product_name']} {i['specification']}" for i in o["items"]) + "）"
+                    for o in orders)
 
 
 class ReturnIntake:
@@ -89,6 +131,9 @@ class ReturnIntake:
             return _result("collecting_information", "请明确选择一个要退货的商品项：" + _items_text(order["items"]), ["item"], items=order["items"]), case_fields
         if item["quantity"] == item["returned_quantity"]:
             return _result("ready_for_evaluation", "", order=order, item=item), case_fields
+        if draft.get("quantity") is None and not quantity_error and item["quantity"] - item["returned_quantity"] == 1:
+            # 只剩 1 件可退时不再追问数量，方案中写明 1 件由用户核对。
+            draft["quantity"] = case_fields["quantity"] = 1
         if draft.get("quantity") is None:
             prefix = "退货数量无效。" if quantity_error else ""
             return _result("collecting_information", f"{prefix}请问 {item['product_name']} 要退几件？当前剩余可选数量为 {item['quantity'] - item['returned_quantity']}。", ["quantity"]), case_fields

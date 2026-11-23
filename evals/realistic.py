@@ -82,7 +82,8 @@ def describe(result: dict) -> tuple[str, dict]:
         buttons["确认换货"] = ("POST", f"/exchange-proposals/{card['id']}/confirm", {"version": card["version"]})
     elif card and card.get("type") in ("item_choice", "spec_choice"):
         lines.append("[选择卡片] 请点选一项：")
-        options = ([(f"{i['product_name']} · {i['specification']}", f"选择商品 {i['id']}") for i in card["items"]]
+        options = ([(f"{i['product_name']} · {i['specification']}" + (f"（{i['order_id']}，{i['ordered_on']} 下单）" if i.get("order_id") else ""),
+                     f"选择商品 {i['id']}") for i in card["items"]]
                    if card["type"] == "item_choice" else [(v["specification"], f"选择规格 {v['sku']}") for v in card["variants"]])
         for text, command in options:
             buttons[text] = ("POST", "/messages", {"content": command})

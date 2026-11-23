@@ -94,7 +94,8 @@ function exchangeProposal(card, ctx) {
 
 function choice(card, ctx) {
   const items = card.type === "item_choice"
-    ? card.items.map(item => ({ text: `${item.product_name} · ${item.specification}`, hint: `可选 ${item.remaining} 件 · ${item.id}`,
+    ? card.items.map(item => ({ text: `${item.product_name} · ${item.specification}`,
+      hint: item.order_id ? `${item.order_id} · ${item.ordered_on} 下单 · 可选 ${item.remaining} 件` : `可选 ${item.remaining} 件 · ${item.id}`,
       command: `选择商品 ${item.id}`, disabled: item.remaining <= 0 }))
     : card.variants.map(v => ({ text: v.specification, hint: `可用 ${v.available} 件 · ${v.sku}`,
       command: `选择规格 ${v.sku}`, disabled: v.available <= 0 }));
