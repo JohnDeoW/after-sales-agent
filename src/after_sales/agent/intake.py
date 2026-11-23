@@ -86,7 +86,7 @@ cancel_return仅用于用户现在明确撤回退货，例如“算了，不退�
 确认语句同时修改商品、数量、原因等信息时，按return提取修改，不能确认尚未展示的新方案。
 用户明确确认已展示的换货方案（如“确认换货”“就按这个方案换”）同样归confirm_return，后端按当前待确认方案类型处理；同时修改换货信息时归exchange。
 用户回答上一轮补充问题时沿用对应意图；显式提出新诉求时切换意图。
-一句话包含多件售后诉求时，intent与字段只提取第一件，其余各写一句简短描述放入other_requests；context.state.pending_requests是之前记下待办的诉求，用户说“另一件”“刚才说的”时按其内容提取。
+一句话包含多件售后诉求时，intent与字段只提取第一件，其余各写一句简短描述放入other_requests；同一订单的多个查询（如物流和订单详情）、正在处理的这件事本身都不算其他诉求；context.state.pending_requests是之前记下待办的诉求，用户说“另一件”“刚才说的”时按其内容提取。
 办理中途询问运费、到账时间、政策条件等问题归policy，policy_question写问题本身；不改变正在办理的退货或换货。
 换货归exchange，收集原订单、原商品item、数量quantity、原因reason和目标规格target_specification，不猜测数量或目标规格。
 换货上下文在state.exchange；改成退款归return，需要新的退货方案与确认，不沿用换货确认。

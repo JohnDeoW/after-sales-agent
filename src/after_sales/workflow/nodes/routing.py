@@ -255,10 +255,14 @@ def recognize(s: State, runtime: Runtime[TurnContext]) -> dict:
                                            if v not in (None, []) and getattr(update, k) in (None, [])})
         state.pop("issue", None)
     if update.other_requests:
-        # 一句话里的其他诉求先记下，本轮回复中说明，办完当前这件再处理。
+        # 一句话里的其他诉求先记下，本轮回复中说明（只提新出现的），办完当前这件再处理。
         pending = state.setdefault("pending_requests", [])
-        pending.extend(text for text in update.other_requests if text not in pending)
-        state["mention_pending"] = list(update.other_requests)
+        fresh = [text.strip().rstrip("。.") for text in update.other_requests]
+        fresh = [text for text in fresh if text and text not in pending]
+        if fresh:
+            pending.extend(fresh)
+            state["mention_pending"] = fresh
+            state.pop("pending_reminded", None)
     state["last_intent"] = update.intent
     if update.intent in SERVICE_INTENTS:
         next_node = "service_handoff"
