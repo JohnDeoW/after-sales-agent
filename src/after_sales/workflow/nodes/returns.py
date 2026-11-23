@@ -60,9 +60,21 @@ def clarify(s: State, runtime: Runtime[TurnContext]) -> dict:
     elif intent == "confirm_return":
         text = (f"请核对具体方案，确认后回复“{proposal['confirm_command']}”。当前尚未记录确认。"
                 if proposal and proposal["status"] == "pending_confirmation" else "当前没有待确认的有效方案，请先补齐退货信息或查看最新方案状态。")
+    elif intent == "issue":
+        # 只描述了问题：先记下商品与问题，问用户想怎么处理，并给出处理方式选项。
+        update = s["update"]
+        issue = {k: getattr(update, k) for k in ("order_id", "item", "reason", "reason_kind", "opened") if getattr(update, k) is not None}
+        s["context"]["state"]["issue"] = issue
+        subject = "，".join(v for v in (update.item, update.reason) if v)
+        text = (f"了解，{subject}。" if subject else "了解。") + "你希望怎么处理？可以退货、换货或维修，也可以转人工客服。"
+        return {"result": _result("clarification_needed", text, proposal=proposal, choices=list(ISSUE_CHOICES))}
     else:
-        text = "请说明要查询订单还是办理退货；也可以直接提供订单号和售后诉求。"
+        text = ("我可以帮你办理退货、换货、维修，查询订单、物流和售后进度，也能解答售后政策。"
+                "请说说遇到了什么问题，是哪件商品。")
     return {"result": _result("clarification_needed", text, proposal=proposal)}
+
+
+ISSUE_CHOICES = ("退货", "换货", "维修", "转人工")
 
 
 # 一件事办到这些状态即告一段落，可以提醒用户之前一并提到的其他诉求。

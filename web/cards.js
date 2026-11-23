@@ -114,6 +114,16 @@ function choice(card, ctx) {
   return node;
 }
 
+function intentChoice(card, ctx) {
+  const node = shell("choice", "你希望怎么处理？");
+  if (!ctx.isLatest) {
+    node.append(el("p", "这是之前的选项，请以最新回复为准。", "card-note"));
+    return node;
+  }
+  node.append(actionSet(...card.options.map(option => button(option.label, () => ctx.act.choose(option.command), "secondary"))));
+  return node;
+}
+
 function record(card, ctx) {
   const titles = { exchange_request: "换货申请", return_request: "退货申请", ticket: "人工工单" };
   // 记录卡显示当前状态；与保存回复时不同则以当前状态为准。
@@ -136,6 +146,7 @@ export function renderCard(card, ctx) {
   if (card.type === "return_proposal") return returnProposal(card, ctx);
   if (card.type === "exchange_proposal") return exchangeProposal(card, ctx);
   if (card.type === "item_choice" || card.type === "spec_choice") return choice(card, ctx);
+  if (card.type === "intent_choice") return intentChoice(card, ctx);
   if (card.type === "record") return record(card, ctx);
   if (card.type === "missing_fields") return missing(card);
   return null;

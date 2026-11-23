@@ -41,6 +41,10 @@ def build_card(result: dict) -> dict | None:
             {"id": item["id"], "product_name": item["product_name"], "specification": item["specification"],
              "remaining": item["quantity"] - item["returned_quantity"],
              "order_id": item.get("order_id"), "ordered_on": item.get("ordered_on")} for item in result["items"]]}
+    if result.get("choices"):
+        # 处理方式选项：按钮发送固定指令，由页面路由进入对应流程。
+        return {"type": "intent_choice", "options": [
+            {"label": label, "command": "转人工" if label == "转人工" else f"选择办理 {label}"} for label in result["choices"]]}
     if "target_specification" in missing and result.get("inventory"):
         return {"type": "spec_choice", "variants": [
             {"sku": v["sku"], "specification": v["specification"], "available": v["available"]}

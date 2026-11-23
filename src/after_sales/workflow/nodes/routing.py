@@ -67,6 +67,24 @@ def _choice(m, s, rt):
     return {"next": "exchange" if intent == "exchange" else "select_read_tool", "update": update}
 
 
+ISSUE_ROUTES = {"退货": ("return", "select_read_tool"), "换货": ("exchange", "exchange"), "维修": ("repair", "service_handoff")}
+
+
+def issue_update(intent: str, issue: dict) -> IntakeUpdate:
+    """用户选定处理方式后沿用之前描述的商品与问题（换货不沿用拆封与原因类型）。"""
+    keys = ("order_id", "item", "reason") if intent == "exchange" else ("order_id", "item", "reason", "reason_kind", "opened")
+    return IntakeUpdate(intent=intent, **{k: issue[k] for k in keys if issue.get(k) is not None})
+
+
+def _choose_handling(m, s, rt):
+    # 问题卡片上的“退货/换货/维修”按钮：按所选方式进入对应流程，沿用已描述的信息。
+    state = s["context"]["state"]
+    intent, next_node = ISSUE_ROUTES[m[1]]
+    update = issue_update(intent, state.pop("issue", {}))
+    state["last_intent"] = intent
+    return {"next": next_node, "update": update}
+
+
 def _confirm_pending_exchange(m, s, rt):
     pending = pending_exchange(rt.context.deps, rt.context.session_id, s["context"]["state"])
     if pending is None:
@@ -78,6 +96,7 @@ COMMANDS = [
     (r"(?:转人工|找人工|人工客服|我要人工客服)[。！!]?", lambda m, s, rt: {"next": "service_handoff", "update": IntakeUpdate(intent="human")}),
     (r"确认换货\s+(EXPROP-[A-Za-z0-9-]+)\s+[vV](\d+)[。！!]?", _to("confirm_exchange", proposal_id=lambda m: m[1], version=lambda m: int(m[2]))),
     (r"选择(商品|规格)\s+([A-Za-z0-9-]+)", _choice),
+    (r"选择办理\s+(退货|换货|维修)", _choose_handling),
     (r"确认换货[。！!]?", _confirm_pending_exchange),
     (r"查询换货\s+(EXC-[A-Za-z0-9-]+)[。！!]?", _read("exchange_query", "request_id")),
     (r"提交申请\s+(CONF-[A-Za-z0-9-]+)[。！!]?", _to("create_request", confirmation_id=lambda m: m[1])),
@@ -228,6 +247,13 @@ def recognize(s: State, runtime: Runtime[TurnContext]) -> dict:
         state.update(draft={}, query_order_id=None)
         if pending:
             state["pending_requests"] = pending
+    issue = state.get("issue")
+    if issue and update.intent in ("return", "exchange", "repair", "quality_dispute"):
+        # 先描述了问题、再说要怎么处理：沿用之前描述里本轮没有重复的信息。
+        filled = issue_update(update.intent if update.intent != "quality_dispute" else "repair", issue)
+        update = update.model_copy(update={k: v for k, v in filled.model_dump(exclude={"intent"}).items()
+                                           if v not in (None, []) and getattr(update, k) in (None, [])})
+        state.pop("issue", None)
     if update.other_requests:
         # 一句话里的其他诉求先记下，本轮回复中说明，办完当前这件再处理。
         pending = state.setdefault("pending_requests", [])

@@ -87,6 +87,10 @@ def describe(result: dict) -> tuple[str, dict]:
                    if card["type"] == "item_choice" else [(v["specification"], f"选择规格 {v['sku']}") for v in card["variants"]])
         for text, command in options:
             buttons[text] = ("POST", "/messages", {"content": command})
+    elif card and card.get("type") == "intent_choice":
+        lines.append("[处理方式选项]")
+        for option in card["options"]:
+            buttons[option["label"]] = ("POST", "/messages", {"content": option["command"]})
     elif card and card.get("type") == "record":
         lines.append(f"[记录卡片] {'人工工单' if card['kind'] == 'ticket' else card['kind']}，状态：{card.get('status_label') or card['status']}")
     if result.get("confirmation_id"):

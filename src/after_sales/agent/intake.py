@@ -11,7 +11,7 @@ from after_sales.config import Settings
 from after_sales.workflow.runtime import ModelCallFailed
 
 
-Intent = Literal["return", "order_query", "return_query", "exchange_query", "case_query", "ticket_query", "submit_return", "policy", "exchange", "logistics", "repair", "quality_dispute", "human", "confirm_return", "cancel_return", "unknown"]
+Intent = Literal["return", "order_query", "return_query", "exchange_query", "case_query", "ticket_query", "submit_return", "policy", "exchange", "logistics", "repair", "quality_dispute", "human", "confirm_return", "cancel_return", "issue", "unknown"]
 Slot = Literal["order_id", "item", "quantity", "reason", "opened", "sku", "ordered_on", "target_specification"]
 
 
@@ -67,7 +67,9 @@ def model_unavailable(detail: dict, step: str) -> IntakeUnavailable:
 
 
 PROMPT = """你是售后请求的信息提取器，只调用 IntakeUpdate，不执行任何业务动作。
-识别 return退货、order_query订单查询、policy政策咨询、exchange换货、logistics物流、repair维修、human人工、unknown其他。
+识别 return退货、order_query订单查询、policy政策咨询、exchange换货、logistics物流、repair维修、human人工、issue售后问题待选处理方式、unknown其他。
+用户只描述商品出了问题或不满意（坏了、没声音、开不了机、不好用、不喜欢等），但没说要退货、换货、维修还是找人工，也不是在问政策时归issue：item写商品描述，order_id按orders规则填写，reason写问题描述，reason_kind故障或损坏为quality、不喜欢等为other，opened按描述（拆开、用过为true）。
+context.state.issue是之前描述的问题；用户随后说要退货、换货或维修时归对应意图，并沿用其中的商品与问题描述。
 查询快递到哪了、何时送达、延迟、疑似丢件或显示签收但未收到归logistics，订单号写入order_id。
 物流追问或补充订单号时继续logistics；未提供订单号不能猜测，后端会使用本次物流查询已选的订单或询问。
 承运商显示签收不代表已核实本人收到，用户陈述不能替代工具中的物流事实。
