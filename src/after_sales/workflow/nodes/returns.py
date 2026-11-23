@@ -46,11 +46,28 @@ def clarify(s: State, runtime: Runtime[TurnContext]) -> dict:
     return {"result": _result("clarification_needed", text, proposal=proposal)}
 
 
+# 一件事办到这些状态即告一段落，可以提醒用户之前一并提到的其他诉求。
+SETTLED = ("application_accepted", "awaiting_return", "ticket_created", "policy_answered", "logistics_found",
+           "exchange_request_found", "investigation_created", "return_request_found", "case_found")
+
+
+def pending_note(state: dict, status: str | None) -> str:
+    """本轮首次提到的其他诉求先说明会稍后处理；当前这件告一段落时提醒一次。"""
+    mentioned = state.pop("mention_pending", None)
+    if mentioned:
+        return "\n你还提到：" + "；".join(mentioned) + "。这件办完后告诉我，我接着帮你处理。"
+    if state.get("pending_requests") and status in SETTLED and not state.get("pending_reminded"):
+        state["pending_reminded"] = True
+        return "\n另外，你之前还提到：" + "；".join(state["pending_requests"]) + "。需要现在办理的话直接告诉我。"
+    return ""
+
+
 def persist_turn(s: State, runtime: Runtime[TurnContext]) -> dict:
     """在一个业务事务中保存消息、草稿、方案与工单；补问轮次超出预算时转人工。"""
     ctx = runtime.context
     result = {**s["result"], "intent": s["update"].intent}
     state = s["context"]["state"]
+    result["reply_text"] = result.get("reply_text", "") + pending_note(state, result.get("status"))
     if result["status"] in ("collecting_information", "clarification_needed"):
         identity = json.dumps({"intent": result["intent"], "missing": result["missing_fields"],
             "draft": state["draft"], "exchange": state.get("exchange"),

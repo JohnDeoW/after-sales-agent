@@ -138,8 +138,10 @@ def _conflict_check(results: dict) -> dict:
                  "candidates": [{"chunk_id": c["chunk_id"], "title": c["title"], "used": c["chunk_id"] in used,
                                  **{k: v for k, v in c["retrieval"].items() if k != "rrf"}}
                                 for c in results.get("ranked", [])[:8]]}
+    # 缺少商品或日期时附上通用候选条款（已过重排阈值），供先说明一般规则再追问；不作为办理依据。
+    general = results["candidates"][:3] if status == "clarification_needed" else []
     return {"status": status, "missing_fields": sorted(missing), "policies": policies, "conflicts": conflicts,
-            "best_score": results.get("best_score"), "retrieval": retrieval,
+            "general": general, "best_score": results.get("best_score"), "retrieval": retrieval,
             "context": {key: results.get(key) for key in ("sku", "ordered_on", "reason_kind")}}
 
 

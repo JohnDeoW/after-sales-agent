@@ -68,13 +68,14 @@ def consult_policy(state: dict, update, content: str, get_order, search, explain
         value = getattr(update, field)
         if value is not None:
             context[field] = value
+    notice = ""
     if context.get("order_id"):
         lookup = get_order(context["order_id"])
         if lookup["status"] != "ok":
-            result = _clarify(context, lookup["message"], ["order_id"])
-            if result["status"] == "clarification_needed":
-                result["status"] = "order_not_found"
-            return result
+            # 订单号对不上时不中断咨询：说明没找到，先按通用规则回答，再请用户核对订单。
+            notice = f"没有找到订单 {context.pop('order_id')}，以下先按通用规则说明。"
+            context.pop("item", None)
+    if context.get("order_id"):
         order = lookup["order"]
         items = order["items"]
         query = (context.get("item") or "").casefold().strip()
@@ -104,8 +105,20 @@ def consult_policy(state: dict, update, content: str, get_order, search, explain
         return _handoff(context, "policy_conflict", "发现同等适用的条款存在冲突，不能自动选择某个版本。", evidence)
     if evidence["status"] == "clarification_needed":
         fields = evidence["missing_fields"]
-        return _clarify(context, "为确定适用条款，请补充：" + "、".join(FIELD_LABELS[f] for f in fields) + "。", fields, evidence)
+        ask = "为确定适用条款，请补充：" + "、".join(FIELD_LABELS[f] for f in fields) + "。"
+        general = evidence.get("general") or []
+        if general and not context.get("clarification_used"):
+            # 先依据通用候选条款说明一般规则，再追问具体信息；仍须引用本轮条款，不能编造。
+            answer = validate_answer(explain(question, general), general)
+            if answer["status"] == "answered":
+                context["clarification_used"] = True
+                return _result("policy_answered", notice + "一般规则：" + answer["text"] + "\n具体能否适用还要看你的订单，" + ask,
+                               fields, citations=answer["citations"], policy_result=evidence)
+        return _clarify(context, notice + ask, fields, evidence)
     if evidence["status"] != "ok":
+        if notice and evidence["status"] == "no_match":
+            return _clarify(context, notice.replace("以下先按通用规则说明。", "") + "请核对订单号，或直接告诉我是哪件商品。",
+                            ["order_id"], evidence)
         if evidence["status"] == "no_match" and not context.get("sku"):
             return _clarify(context, "未找到相关条款，请补充商品SKU或本人订单号。", ["sku"], evidence)
         if evidence["status"] == "no_match":
@@ -118,5 +131,5 @@ def consult_policy(state: dict, update, content: str, get_order, search, explain
         return _handoff(context, "no_answer", "检索条款未覆盖所问事项，无法给出有依据的答案。", evidence)
     context.pop("clarification_used", None)
     context.pop("search_attempts", None)
-    return _result("policy_answered", answer["text"] + "\n本次仅为咨询，未创建售后申请或执行退款。",
+    return _result("policy_answered", notice + answer["text"] + "\n本次仅为咨询，未创建售后申请或执行退款。",
                    citations=answer["citations"], policy_result=evidence)

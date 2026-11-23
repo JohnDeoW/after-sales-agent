@@ -34,5 +34,17 @@ def policy_consultation(s: State, runtime: Runtime[TurnContext]) -> dict:
     if ctx.deps.policy_rewriter is not None:
         def rewrite(question, message):
             return model_step("PolicyRequery", lambda: ctx.deps.policy_rewriter(question, message))
-    return {"result": consult_policy(s["context"]["state"], s["update"], ctx.content,
-                                      lambda order_id: get_order(runtime, order_id), search, explain, rewrite)}
+    state, update, proposal = s["context"]["state"], s["update"], s["proposal"]
+    draft = state["draft"]
+    policy = state.setdefault("policy", {})
+    # 办理中途的追问（运费、到账时间等）沿用当前办理的订单与商品，不再要用户补订单号。
+    if draft.get("order_id") and not (update.order_id or update.sku or policy.get("order_id") or policy.get("sku")):
+        policy.update(order_id=draft["order_id"], item=draft.get("order_item_id") or draft.get("item"))
+        if draft.get("reason_kind") and not update.reason_kind:
+            policy["reason_kind"] = draft["reason_kind"]
+    result = consult_policy(state, update, ctx.content, lambda order_id: get_order(runtime, order_id), search, explain, rewrite)
+    if proposal and proposal["status"] == "pending_confirmation":
+        # 答完追问回到待确认的方案：再附上方案卡片，用户可直接确认或修改。
+        result["reply_text"] += f"\n你的退货方案 v{proposal['version']} 仍待确认，可以确认、修改或取消。"
+        result["proposal"] = proposal
+    return {"result": result}

@@ -90,6 +90,15 @@ COMMAND_NODES = ["prepare_context", "select_read_tool", "confirm", "cancel", "cr
                  "confirm_exchange", "service_handoff", "exchange"]
 
 
+# 嵌在一句话里的确认/提交指令（如照抄“确认方案 PROP-… v1”再补一句话），前面不能带否定。
+EMBEDDED = [
+    (r"确认方案\s+(PROP-[A-Za-z0-9-]+)\s+[vV](\d+)", lambda m: ("confirm", {"proposal_id": m[1], "version": int(m[2])})),
+    (r"确认换货\s+(EXPROP-[A-Za-z0-9-]+)\s+[vV](\d+)", lambda m: ("confirm_exchange", {"proposal_id": m[1], "version": int(m[2])})),
+    (r"提交申请\s+(CONF-[A-Za-z0-9-]+)", lambda m: ("create_request", {"confirmation_id": m[1]})),
+]
+NEGATED = r"(?:不|别|先不|暂不|没有?|不要)\s*(?:确认|提交)"
+
+
 def route_command(s: State, runtime: Runtime[TurnContext]) -> dict:
     # HTTP 操作路由传入结构化指令，非法编号也交给业务校验，不能退回模型猜测。
     if s.get("command"):
@@ -102,6 +111,12 @@ def route_command(s: State, runtime: Runtime[TurnContext]) -> dict:
             routed = handler(match, s, runtime)
             if routed is not None:
                 return routed
+    if not re.search(NEGATED, text):
+        for pattern, build in EMBEDDED:
+            match = re.search(pattern, text)
+            if match:
+                next_node, command = build(match)
+                return {"next": next_node, "command": command}
     return {"next": "prepare_context"}
 
 
@@ -117,11 +132,17 @@ def prepare_context(s: State, runtime: Runtime[TurnContext]) -> dict:
     return {"current_order": get_order(runtime, order_id).get("order") if order_id else None}
 
 
-CONFIRM_RETURN = (r"(?:^|[，,。；;！!])\s*(?:我)?(?:确认(?:办理|退货|(?:按)?(?:当前|这个|现在的)方案(?:办理|退货)?)?"
-                  r"|同意(?:按)?(?:当前|这个|现在的)方案(?:办理|退货)?|就按(?:当前|这个|现在的)方案(?:办理|退货)(?:吧)?)\s*[。！!]*$")
-CONFIRM_EXCHANGE = (r"(?:^|[，,。；;！!])\s*(?:我)?(?:确认(?:换货|办理|(?:按)?(?:当前|这个|现在的)方案(?:换货|办理)?)?"
-                    r"|同意(?:按)?(?:当前|这个|现在的)方案(?:换货|办理)?|就按(?:当前|这个|现在的)方案(?:换货|办理)(?:吧)?)\s*[。！!]*$")
 CANCEL_RETURN = r"(?:^|[，,。；;！!])\s*(?:我)?(?:不退了|不退货了|取消(?:本次|这次)?(?:退货(?:申请)?|办理))\s*[。！!]*$"
+# 口语确认：模型判断为“现在同意”之外，还要有明确的同意用语，且没有否定、疑问、条件或状态声称。
+# 单独的“好的”“嗯”“知道了”只是应答，不算确认。
+VAGUE_ONLY = r"[\s，,。.!！~～]*(?:好|好的|好吧|嗯+|哦+|噢|知道了|收到|明白|了解|ok|OK)[\s，,。.!！~～]*"
+CONSENT = r"确认|同意|就这样|就这么办|就按|按这个|行吧|^行|可以|没问题|办吧|退吧|换吧|提交吧|帮我提交"
+DENY = r"不|没|别|等等|等一下|再想|考虑|已经确认|确认过|审批|管理员|忽略|吗|呢|[?？]|如果|怎么|是否|假如"
+
+
+def explicit_consent(text: str) -> bool:
+    text = text.strip()
+    return (not re.fullmatch(VAGUE_ONLY, text)) and bool(re.search(CONSENT, text)) and not re.search(DENY, text)
 RECOGNIZED_NODES = ["select_read_tool", "query_agent", "clarify", "policy_consultation", "exchange", "service_handoff",
                     "confirm", "cancel", "confirm_exchange"]
 
@@ -146,7 +167,7 @@ def recognize(s: State, runtime: Runtime[TurnContext]) -> dict:
             getattr(update, key) is not None and getattr(update, key) != exchange.get(key)
             for key in ("order_id", "item", "quantity", "target_specification", "reason"))
         pending = pending_exchange(ctx.deps, ctx.session_id, state)
-        if pending and re.search(CONFIRM_EXCHANGE, content) and not changed:
+        if pending and explicit_consent(content) and not changed:
             return {"update": update, "next": "confirm_exchange",
                     "command": {"proposal_id": pending["id"], "version": pending["version"]}}
         # 修改了换货内容或只是“好的”等普通应答：继续换货流程，重新展示方案，不记录确认。
@@ -162,7 +183,7 @@ def recognize(s: State, runtime: Runtime[TurnContext]) -> dict:
         if changed:
             # 同一句话修改了办理内容，先展示新方案，不能沿用这次确认。
             update = update.model_copy(update={"intent": "return"})
-        elif s["proposal"] and s["proposal"]["status"] in ("pending_confirmation", "confirmed") and re.search(CONFIRM_RETURN, content):
+        elif s["proposal"] and s["proposal"]["status"] in ("pending_confirmation", "confirmed") and explicit_consent(content):
             # 模型意图还需配合当前的明确同意表达；“已经确认”等状态声称不算授权。
             proposal = s["proposal"]
             return {"update": update, "next": "confirm",
@@ -176,10 +197,29 @@ def recognize(s: State, runtime: Runtime[TurnContext]) -> dict:
             return {"update": update, "next": "cancel",
                     "command": {"expected_case_id": context["loaded_case_id"],
                                 "expected_revision": context["case_revision"]}}
-    if (state.get("cancelled") or state.get("completed")) and update.intent == "return":
+    progress = context.get("progress") or {}
+    confirmation = progress.get("confirmation")
+    if update.intent == "submit_return" and confirmation and not progress.get("return_request") and explicit_consent(content):
+        # 口语要求提交已确认的方案（如“可以，帮我提交”），等同点击“提交退货申请”。
+        return {"update": update, "next": "create_request", "command": {"confirmation_id": confirmation["id"]}}
+    draft = state["draft"]
+    other_item = update.item is not None and draft.get("order_item_id") and (
+        match_order_item((s["current_order"] or {}).get("items", []), update.item) or {}).get("id") != draft["order_item_id"]
+    new_matter = (update.order_id is not None and update.order_id != draft.get("order_id")) or other_item
+    # 退货已取消、已退款，或已受理后要办另一件商品：结束原事项，另开新案件，不再当作修改原申请。
+    if update.intent == "return" and (state.get("cancelled") or state.get("completed")
+                                      or (progress.get("return_request") and new_matter)):
         context["case_id"] = None
+        pending = state.get("pending_requests")
         state.clear()
         state.update(draft={}, query_order_id=None)
+        if pending:
+            state["pending_requests"] = pending
+    if update.other_requests:
+        # 一句话里的其他诉求先记下，本轮回复中说明，办完当前这件再处理。
+        pending = state.setdefault("pending_requests", [])
+        pending.extend(text for text in update.other_requests if text not in pending)
+        state["mention_pending"] = list(update.other_requests)
     state["last_intent"] = update.intent
     if update.intent in SERVICE_INTENTS:
         next_node = "service_handoff"

@@ -271,11 +271,16 @@ def save_exchange_proposal(connection, session_id, user_id, state, result):
     if previous and previous["status"] == "confirmed":
         request = connection.execute("SELECT id, status FROM exchange_requests WHERE proposal_id = ?", (previous["id"],)).fetchone()
         if request and request["status"] not in ("completed", "cancelled"):
-            if details != json.loads(previous["details_json"]):
+            accepted = json.loads(previous["details_json"])
+            if details == accepted:
+                result.update(status="exchange_request_found", exchange_request=read_exchange(connection, request["id"]))
+                result["reply_text"] = exchange_text(result["exchange_request"])
+                return
+            if details is not None and details["order_item_id"] == accepted["order_item_id"]:
+                # 修改已受理的同一件换货必须先取消原申请；其他商品或改办退货是新的事项，不影响已受理的申请。
                 raise ProposalConflict("换货申请已受理，请先取消原申请并释放库存，再修改或切换方案。")
-            result.update(status="exchange_request_found", exchange_request=read_exchange(connection, request["id"]))
-            result["reply_text"] = exchange_text(result["exchange_request"])
-            return
+            state.pop("exchange_proposal_id", None)
+            previous = None
     if previous and previous["status"] == "pending_confirmation" and details == json.loads(previous["details_json"]):
         proposal = proposal_view(previous)
     else:

@@ -8,7 +8,8 @@ def select(value: dict, keys: tuple) -> dict:
 def build_context(context: dict, order: dict | None, proposal: dict | None) -> dict:
     state = context["state"]
     progress = context["progress"]
-    compact_state = select(state, ("last_intent", "query_order_id", "logistics_order_id", "logistics_dispute", "exchange_request_id"))
+    compact_state = select(state, ("last_intent", "query_order_id", "logistics_order_id", "logistics_dispute", "exchange_request_id",
+                                   "pending_requests"))
     compact_state["draft"] = select(state["draft"],
                                   ("order_id", "order_item_id", "item", "quantity", "reason", "reason_kind", "opened"))
     compact_state["exchange"] = select(state.get("exchange", {}), ("order_id", "item", "quantity", "target_specification", "reason"))

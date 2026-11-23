@@ -85,6 +85,14 @@ def load_context(path: Path, session_id: str, snapshot: dict | None = None) -> d
                 "history": [dict(message) for message in reversed(history)]}
 
 
+def append_reply_note(path: Path, message_id: int, note: str) -> dict:
+    """在已保存的助手回复末尾追加提示（如提醒用户之前提到的其他诉求），返回更新后的消息。"""
+    with connect_database(path) as connection:
+        connection.execute("UPDATE messages SET content = content || ? WHERE id = ? AND role = 'assistant'", (note, message_id))
+        row = connection.execute("SELECT * FROM messages WHERE id = ?", (message_id,)).fetchone()
+        return {key: row[key] for key in ("id", "role", "content", "created_at")} | {"card": json.loads(row["card_json"]) if row["card_json"] else None}
+
+
 def save_turn(path: Path, session_id: str, user_id: str, content: str,
               context: dict, result: dict, case_fields: dict | None) -> dict:
     with connect_database(path) as connection:
