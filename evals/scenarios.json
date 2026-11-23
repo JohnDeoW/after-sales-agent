@@ -2,7 +2,7 @@
   {"id":"normal_refund","group":"normal","finish":"refund","amount_cents":3333,"item_id":"ITEM-003","turns":[
     {"message":"订单ORD-DEMO-002退1根数据线，买错了，未拆封。","fixture":{"intent":"return","order_id":"ORD-DEMO-002","item":"数据线","quantity":1,"reason":"买错了","reason_kind":"other","opened":false},"expect":{"status":"awaiting_confirmation","proposal.refund_amount_cents":3333},"tools":["get_order"],"citations":true}]},
   {"id":"missing_information","group":"missing","turns":[
-    {"message":"我要退货","fixture":{"intent":"return"},"expect":{"status":"collecting_information","missing_fields":["order_id"]}},
+    {"message":"我要退货","fixture":{"intent":"return"},"expect":{"status":"collecting_information","missing_fields":["item"]}},
     {"message":"订单ORD-DEMO-001退1件，不需要了，未拆封。","fixture":{"intent":"return","order_id":"ORD-DEMO-001","quantity":1,"reason":"不需要了","reason_kind":"other","opened":false},"expect":{"status":"awaiting_confirmation","proposal.refund_amount_cents":19900},"citations":true}]},
   {"id":"expired_return","group":"policy","turns":[
     {"message":"订单ORD-DEMO-003电脑支架退1件，不需要了，未拆封。","fixture":{"intent":"return","order_id":"ORD-DEMO-003","item":"电脑支架","quantity":1,"reason":"不需要了","reason_kind":"other","opened":false},"expect":{"status":"ineligible","assessment.code":"ordinary_window_expired"},"citations":true}]},

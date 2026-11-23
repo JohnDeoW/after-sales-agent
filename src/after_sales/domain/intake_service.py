@@ -34,7 +34,11 @@ def match_order_item(items: list[dict], text: str | None, loose: bool = True) ->
             matches.append(item)
     if not matches and loose and len(items) == 1:
         only = items[0]
-        if set(query) & set((only["product_name"] + only["specification"]).casefold()):
+        spec = only["specification"].casefold()
+        # 只容忍错别字：带否定，或提到与该商品不同的颜色/规格（如只有白色却说“黑色键盘”）时不选中。
+        conflicting = any(color not in spec for color in re.findall(r"[^\W\d_]色", query))
+        if (not re.search(r"不|非|别", query) and not conflicting
+                and set(query) & set(only["product_name"].casefold())):
             return only
     return matches[0] if len(matches) == 1 else None
 
