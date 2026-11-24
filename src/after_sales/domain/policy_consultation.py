@@ -67,7 +67,7 @@ def consult_policy(state: dict, update, content: str, get_order, search, explain
         value = getattr(update, field)
         if value is not None:
             context[field] = value
-    notice = ""
+    notice, order_facts = "", None
     if context.get("order_id"):
         lookup = get_order(context["order_id"])
         if lookup["status"] != "ok":
@@ -85,6 +85,9 @@ def consult_policy(state: dict, update, content: str, get_order, search, explain
             return _clarify(context, "请选择咨询的商品项：" + _items_text(items), ["item"])
         # 订单事实优先于模型/用户自述；不保存成退货草稿。
         context.update(sku=item["sku"], ordered_on=order["ordered_on"])
+        order_facts = {"order_id": order["id"], "ordered_on": order["ordered_on"], "signed_on": order.get("signed_on"),
+                 "product": f"{item['product_name']} {item['specification']}",
+                 "shipping_insurance": "已购买退货运费险" if order.get("shipping_insurance") else "未购买退货运费险"}
     if context.get("ordered_on"):
         try:
             context["ordered_on"] = date.fromisoformat(context["ordered_on"]).isoformat()
@@ -125,7 +128,7 @@ def consult_policy(state: dict, update, content: str, get_order, search, explain
                             + ("（已换一种问法重新检索）" if context.get("requery") else "")
                             + "，我不能凭推测回答。", evidence)
         return _handoff(context, evidence["status"], "暂时没有取得可用的政策依据，我不能凭推测回答。", evidence)
-    answer = validate_answer(explain(question, evidence["policies"]), evidence["policies"])
+    answer = validate_answer(explain(question, evidence["policies"], order_facts), evidence["policies"])
     if answer["status"] == "no_answer":
         return _handoff(context, "no_answer", "现有政策里没有找到对这个问题的明确规定，我不能凭推测回答。", evidence)
     context.pop("clarification_used", None)

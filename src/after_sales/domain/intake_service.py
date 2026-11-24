@@ -54,11 +54,12 @@ def resolve_order_ref(ref: str | None, order_ids: list[str]) -> str | None:
     return hits[0] if len(hits) == 1 else ref
 
 
-def locate_items(orders: list[dict], text: str | None) -> tuple[list[dict], bool]:
-    """在本人已签收订单中按描述找商品：返回（候选商品，是否按描述命中）；没有命中时返回全部可选商品。"""
+def locate_items(orders: list[dict], text: str | None, busy: set[str] = frozenset()) -> tuple[list[dict], bool]:
+    """在本人已签收订单中按描述找商品：返回（候选商品，是否按描述命中）；没有命中时返回全部可选商品。
+    busy 为已有进行中退货/换货申请的商品项，不作为候选。"""
     pool = [{**item, "order_id": order["id"], "ordered_on": order["ordered_on"]}
             for order in orders if order["status"] == "delivered" for item in order["items"]
-            if item["quantity"] > item["returned_quantity"]]
+            if item["quantity"] > item["returned_quantity"] and item["id"] not in busy]
     if text:
         hits = [item for item in pool if match_order_item([item], text, loose=False)]
         if hits:

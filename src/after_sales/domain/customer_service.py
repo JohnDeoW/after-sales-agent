@@ -67,6 +67,20 @@ class CustomerService:
             # 带上商品摘要，便于用户按商品选择订单、识别模型按描述或简写对应订单。
             return [read_order(connection, row["id"]) for row in rows]
 
+    def active_item_ids(self, session_id: str) -> set[str]:
+        """本人已有进行中退货或换货申请的商品项（未完成、未取消），找商品时不再作为候选。"""
+        with connect_database(self.db_path) as connection:
+            user = _session_user(connection, session_id)
+            rows = connection.execute(
+                """SELECT p.order_item_id FROM return_requests r
+                   JOIN confirmations f ON f.id = r.confirmation_id JOIN proposals p ON p.id = f.proposal_id
+                   JOIN cases c ON c.id = p.case_id
+                   WHERE c.user_id = ? AND r.status NOT IN ('refunded', 'cancelled', 'superseded', 'approval_rejected')
+                   UNION
+                   SELECT order_item_id FROM exchange_requests WHERE user_id = ? AND status NOT IN ('completed', 'cancelled')""",
+                (user["id"], user["id"])).fetchall()
+            return {row[0] for row in rows}
+
     def get_order(self, session_id: str, order_id: str) -> dict:
         with connect_database(self.db_path) as connection:
             user = _session_user(connection, session_id)

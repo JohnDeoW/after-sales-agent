@@ -39,6 +39,8 @@ def seed_demo(connection: sqlite3.Connection, as_of: date) -> None:
             for order_id, user_id, days in orders
         ],
     )
+    # 演示：部分订单下单时购买了退货运费险，政策咨询可据此回答寄回运费。
+    connection.executemany("UPDATE orders SET shipping_insurance = 1 WHERE id = ?", [("ORD-DEMO-001",), ("ORD-DEMO-004",)])
     connection.executemany(
         """INSERT INTO order_items
            (id, order_id, sku, product_name, specification, quantity, paid_amount_cents)

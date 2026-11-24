@@ -10,7 +10,8 @@ CREATE TABLE orders (
     status TEXT NOT NULL,
     ordered_on TEXT NOT NULL,
     signed_on TEXT,
-    shipping_paid_cents INTEGER NOT NULL DEFAULT 0 CHECK (shipping_paid_cents >= 0)
+    shipping_paid_cents INTEGER NOT NULL DEFAULT 0 CHECK (shipping_paid_cents >= 0),
+    shipping_insurance INTEGER NOT NULL DEFAULT 0 CHECK (shipping_insurance IN (0, 1))
 );
 
 CREATE TABLE order_items (

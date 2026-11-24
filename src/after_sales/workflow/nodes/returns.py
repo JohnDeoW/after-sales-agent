@@ -25,7 +25,8 @@ def collect_information(s: State, runtime: Runtime[TurnContext]) -> dict:
     if result["missing_fields"] == ["order_id"] and not state["draft"].get("order_id"):
         # 没有订单号：按描述在本人已签收订单中找商品，唯一命中直接继续，否则给出带订单的候选卡片。
         description = state["draft"].get("item")
-        hits, matched = locate_items(ctx.deps.customers.list_orders(ctx.session_id), description)
+        hits, matched = locate_items(ctx.deps.customers.list_orders(ctx.session_id), description,
+                                     ctx.deps.customers.active_item_ids(ctx.session_id))
         if matched and len(hits) == 1:
             located = s["update"].model_copy(update={"order_id": hits[0]["order_id"], "item": hits[0]["id"]})
             lookup = get_order(runtime, hits[0]["order_id"])

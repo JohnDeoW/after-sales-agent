@@ -21,7 +21,8 @@ def exchange(s: State, runtime: Runtime[TurnContext]) -> dict:
     if result["missing_fields"] == ["order_id"] and not state.get("exchange", {}).get("order_id"):
         # 没有订单号：按描述找商品，唯一命中直接继续，否则给出带订单的候选卡片。
         description = state["exchange"].get("item")
-        hits, matched = locate_items(ctx.deps.customers.list_orders(ctx.session_id), description)
+        hits, matched = locate_items(ctx.deps.customers.list_orders(ctx.session_id), description,
+                                     ctx.deps.customers.active_item_ids(ctx.session_id))
         if matched and len(hits) == 1:
             located = update.model_copy(update={"order_id": hits[0]["order_id"], "item": hits[0]["id"]})
             result = collect_exchange(state, located, lambda oid: get_order(runtime, oid), inventory)
@@ -42,7 +43,10 @@ def policy_consultation(s: State, runtime: Runtime[TurnContext]) -> dict:
     def search(args):
         return read("search_policy", ctx.deps.policy_tool, args)
 
-    def explain(question, policies):
+    def explain(question, policies, facts=None):
+        # 已核实的本人订单事实（如是否购买退货运费险）一并交给解释模型；没有订单时不传。
+        if facts:
+            return model_step("PolicyAnswer", lambda: ctx.deps.policy_explainer(question, policies, facts=facts))
         return model_step("PolicyAnswer", lambda: ctx.deps.policy_explainer(question, policies))
     rewrite = None
     if ctx.deps.policy_rewriter is not None:

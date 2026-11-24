@@ -23,6 +23,10 @@ def initialize_session_storage(path: Path = DEMO_DB_PATH) -> None:
         columns = {row["name"] for row in connection.execute("PRAGMA table_info(proposals)")}
         if "details_json" not in columns:
             connection.execute("ALTER TABLE proposals ADD COLUMN details_json TEXT NOT NULL DEFAULT '{}'")
+        columns = {row["name"] for row in connection.execute("PRAGMA table_info(orders)")}
+        if "shipping_insurance" not in columns:
+            # 是否购买退货运费险：政策咨询时作为已核实的订单事实。
+            connection.execute("ALTER TABLE orders ADD COLUMN shipping_insurance INTEGER NOT NULL DEFAULT 0")
         columns = {row["name"] for row in connection.execute("PRAGMA table_info(messages)")}
         if "card_json" not in columns:
             connection.execute("ALTER TABLE messages ADD COLUMN card_json TEXT")

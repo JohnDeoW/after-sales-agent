@@ -33,7 +33,7 @@ def expect(actual, wanted, label):
         raise AssertionError(f"{label}: expected {wanted!r}, got {actual!r}")
 
 
-def offline_explanation(question, policies, assessment=None):
+def offline_explanation(question, policies, assessment=None, facts=None):
     return {"text": assessment["explanation"] if assessment else policies[0]["body"],
             "citation_ids": [policies[0]["chunk_id"]]}
 
