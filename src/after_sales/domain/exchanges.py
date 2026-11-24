@@ -302,7 +302,7 @@ def save_exchange_proposal(connection, session_id, user_id, state, result):
     state["exchange_proposal_id"] = proposal["id"]
     result["exchange_proposal"] = proposal
     d = proposal["details"]
-    result["reply_text"] = (f"换货方案 {proposal['id']} v{proposal['version']}：订单 {d['order_id']}，"
-                            f"{d['product_name']} {d['original_specification']} → {d['target_specification']}，{d['quantity']} 件，"
-                            f"原因：{d['reason']}；同款等价换货，无差价。"
-                            f"请核对后回复“{proposal['confirm_command']}”。当前尚未创建申请或预留库存，执行时会再次核对。")
+    result["reply_text"] = (f"已为你生成换货方案：订单 {d['order_id']} 的{d['product_name']}，"
+                            f"{d['original_specification']} 换成 {d['target_specification']}，{d['quantity']} 件，"
+                            f"原因：{d['reason']}，同款等价换货，无差价。\n"
+                            "请在卡片上点“确认换货”，或直接回复“确认换货”；确认时会再核对一次库存，确认前不会创建申请。")

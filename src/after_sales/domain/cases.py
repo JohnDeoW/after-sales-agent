@@ -115,9 +115,9 @@ def describe_progress(progress):
             actions = ["confirm_proposal", "modify_proposal", "cancel_return"]
             progress["next_step"] = "原确认已过期或失效，请重新核对方案并确认，尚未创建申请。"
         if proposal and "confirm_proposal" in actions:
-            progress["next_step"] += f"可回复“{proposal['confirm_command']}”。"
+            progress["next_step"] += "可在方案卡片上点“确认此版本”，或回复“确认”。"
         if "submit_return" in actions:
-            progress["next_step"] += f"可回复“提交申请 {progress['confirmation']['id']}”。"
+            progress["next_step"] += "可点“提交退货申请”，或回复“帮我提交”。"
     progress["available_actions"] = actions
 
 

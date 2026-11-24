@@ -54,11 +54,11 @@ def clarify(s: State, runtime: Runtime[TurnContext]) -> dict:
         return {"result": s["result"]}
     intent, proposal = s["update"].intent, s["proposal"]
     if intent == "submit_return":
-        text = "请使用确认回复中的“提交申请 CONF-…”完整指令提交；尚未确认时请先核对并确认方案。"
+        text = "请先核对并确认方案；已确认的话点“提交退货申请”或回复“帮我提交”。"
     elif intent == "cancel_return":
         text = "如需结束本次办理，请明确回复“取消退货”。"
     elif intent == "confirm_return":
-        text = (f"请核对具体方案，确认后回复“{proposal['confirm_command']}”。当前尚未记录确认。"
+        text = ("请先在方案卡片上核对，确认的话点“确认此版本”或回复“确认”。当前尚未记录确认。"
                 if proposal and proposal["status"] == "pending_confirmation" else "当前没有待确认的有效方案，请先补齐退货信息或查看最新方案状态。")
     elif intent == "issue":
         # 只描述了问题：先记下商品与问题，问用户想怎么处理，并给出处理方式选项。

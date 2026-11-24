@@ -74,10 +74,10 @@ def request_text(request: dict) -> str:
     if request["status"] == "refund_unknown":
         return f"申请 {request['id']} 的退款操作 {request['refund_operation']['id']} 结果待核对，尚不能确认成功或失败，请核对原操作。"
     prefix = "原申请" if request["status"] in ("cancelled", "superseded") else "已受理申请"
+    product = (request.get("details") or {}).get("product_name") or "商品"
     return (f"{prefix} {request['id']}，当前状态：{request['status_label']}。"
-            f"订单 {request['order_id']}，商品项 {request['order_item_id']}，{request['quantity']} 件，"
-            f"预计商品退款 {amount // 100}.{amount % 100:02d} 元。"
-            f"{request['next_step']}尚未退款。可回复“查询申请 {request['id']}”查询进度。")
+            f"订单 {request['order_id']} 的{product} {request['quantity']} 件，预计退款 {amount // 100}.{amount % 100:02d} 元。"
+            f"{request['next_step']}尚未退款，进度可在案件详情中查看。")
 
 
 def revalidate_request(connection, request_id, *, require_approval=True):

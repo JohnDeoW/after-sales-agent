@@ -7,7 +7,6 @@ import sqlite3
 from after_sales.domain.message_cards import build_card
 from after_sales.domain.customer_service import CustomerService, _session_user
 from after_sales.domain.returns import evaluate_return, assessment_reply, assessment_status
-from after_sales.domain.policy_rules import references_text
 from after_sales.storage.database import connect_database, read_order, append_messages
 from after_sales.storage.case_progress import save_state, case_state
 from after_sales.domain.authorizations import expires_at, snapshot, valid, invalidate
@@ -35,21 +34,26 @@ def proposal_view(row: sqlite3.Row | dict) -> dict:
     return proposal
 
 
-def proposal_text(proposal: dict) -> str:
+def proposal_text(proposal: dict, explanation: str | None = None) -> str:
+    """方案回复只说清商品、数量、金额、审批与下一步；条款原文、编号与退回要求放在方案卡片和案件详情中。"""
     details = proposal["details"]
     amount = proposal["refund_amount_cents"]
-    text = (f"方案 {proposal['id']} v{proposal['version']}：订单 {details['order_id']}，"
-            f"{details['product_name']}（{details['specification']}）{proposal['quantity']} 件，"
-            f"原因：{proposal['reason']}；预计商品退款 {amount // 100}.{amount % 100:02d} 元（不含运费）。")
+    subject = (f"订单 {details['order_id']} 的{details['product_name']}（{details['specification']}）{proposal['quantity']} 件，"
+               f"原因：{proposal['reason']}，预计退款 {amount // 100}.{amount % 100:02d} 元（不含运费）")
+    notes = ""
     if "quality_issue" in details["approval_reasons"]:
-        text += "质量原因需人工判断，尚未认定责任。"
+        notes += "质量原因需要人工核实，尚未认定责任。"
     if "high_amount" in details["approval_reasons"]:
-        text += "金额超过自动处理门槛，需要客服批准。"
-    text += details["return_requirements"]
-    text += "\n" + references_text(details.get("policy_refs", [])) + "\n"
+        notes += "金额超过自动处理门槛，提交后需客服审批。"
+    if not details["approval_reasons"]:
+        notes += "无需审批。"
+    if explanation:
+        notes += explanation
     if proposal["status"] == "confirmed":
-        return text + "你已确认此版本；尚未创建售后申请或执行退款。"
-    return text + f"同意请回复“{proposal['confirm_command']}”；也可修改信息或回复“{proposal['cancel_command']}”。尚未创建售后申请或执行退款。"
+        return (f"你已确认退货方案：{subject}。{notes}\n"
+                "点“提交退货申请”或回复“帮我提交”即可提交；提交前不会退款。")
+    return (f"已为你生成退货方案（第 {proposal['version']} 版）：{subject}。{notes}\n"
+            "请在下方方案卡片核对后点“确认此版本”，或直接回复“确认”；要改数量、原因等直接告诉我。确认前不会创建申请或退款。")
 
 
 def assessment_details(assessment, draft):
@@ -97,7 +101,7 @@ def sync_proposal(connection: sqlite3.Connection, case_id: str, state: dict, res
     proposal = proposal_view(latest)
     state["proposal_id"] = proposal["id"]
     result.update(proposal=proposal, status="confirmed" if proposal["status"] == "confirmed" else "awaiting_confirmation",
-                  reply_text=proposal_text(proposal) + ("\n政策解释：" + result["policy_explanation"] if result.get("policy_explanation") else ""))
+                  reply_text=proposal_text(proposal, result.get("policy_explanation")))
 
 
 class ProposalService:
@@ -175,7 +179,6 @@ class ProposalService:
                         "SELECT id FROM confirmations WHERE proposal_id = ?", (proposal_id,),
                     ).fetchone()["id"]
                     result["submit_command"] = f"提交申请 {result['confirmation_id']}"
-                    result["reply_text"] += f"如需提交，请回复“{result['submit_command']}”。"
             elif action == "cancel":
                 if current is not None:
                     invalidate(connection, current["id"], "用户撤回办理与授权", cancelled=True)

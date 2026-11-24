@@ -2,6 +2,7 @@
 
 import json
 import hashlib
+from datetime import datetime
 
 from after_sales.domain.customer_service import _session_user
 from after_sales.storage.database import connect_database
@@ -57,16 +58,25 @@ class LogisticsService:
             return {"status": "ok", "logistics": read_logistics(connection, order_id)}
 
 
+def _when(value: str) -> str:
+    """“2026-11-19T16:00:00+08:00”显示为“11月19日 16:00”。"""
+    try:
+        moment = datetime.fromisoformat(value)
+    except (TypeError, ValueError):
+        return value or ""
+    return f"{moment.month}月{moment.day}日 {moment:%H:%M}"
+
+
 def logistics_text(shipment):
     text = f"订单 {shipment['order_id']} 的模拟物流：{shipment['status_label']}。"
     if shipment["tracking_number"]:
         text += f"承运商：{shipment['carrier']}，运单号：{shipment['tracking_number']}。"
     events = shipment["events"][-3:]
-    text += "最近轨迹：" + "；".join(f"{e['occurred_at']} {e['description']}" for e in events) + "。" if events else "暂无可查询的物流轨迹。"
+    text += "最近轨迹：" + "；".join(f"{_when(e['occurred_at'])} {e['description']}" for e in events) + "。" if events else "暂无可查询的物流轨迹。"
     if shipment["status"] == "delivered":
         text += "这表示承运商记录已签收，不代表已核实本人收货。"
     elif shipment["estimated_delivery_at"]:
-        text += f"物流记录中的预计送达时间：{shipment['estimated_delivery_at']}（仅为预计）。"
+        text += f"物流记录中的预计送达时间：{_when(shipment['estimated_delivery_at'])}（仅为预计）。"
     else:
         text += "暂无已确认的预计送达时间。"
     if shipment["status"] == "lost_pending":

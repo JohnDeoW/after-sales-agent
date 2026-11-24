@@ -11,9 +11,8 @@ FIELD_LABELS = {"sku": "商品SKU或本人订单号", "ordered_on": "下单日�
 
 
 def _handoff_result(handoff: dict, evidence: dict | None = None) -> dict:
-    text = handoff["message"] + "需要人工核对，未执行退款。"
-    if handoff["policy_refs"]:
-        text += "\n待核对条款：" + "；".join(p["chunk_id"] for p in handoff["policy_refs"])
+    # 待核对的条款编号保存在工单里给客服，不放进给客户的回复。
+    text = handoff["message"] + "已请人工客服核对，没有执行任何退款或办理。"
     return _result("manual_review_required", text, handoff=handoff, policy_result=evidence)
 
 
@@ -32,7 +31,7 @@ def _handoff(context: dict, reason: str, message: str, evidence: dict | None = N
 
 def _clarify(context: dict, text: str, fields: list[str], evidence: dict | None = None) -> dict:
     if context.get("clarification_used"):
-        return _handoff(context, "insufficient_information", "补充后仍缺少确定适用政策所需的信息，已停止自动判断。", evidence)
+        return _handoff(context, "insufficient_information", "补充后仍不能确定适用哪条政策。", evidence)
     context["clarification_used"] = True
     return _result("clarification_needed", text + "补充后将再核查一次。", fields, policy_result=evidence)
 
@@ -102,7 +101,7 @@ def consult_policy(state: dict, update, content: str, get_order, search, explain
         if requery and requery != question:
             evidence = search({"question": requery, "user_message": question_message, **facts})
     if evidence["status"] == "conflict":
-        return _handoff(context, "policy_conflict", "发现同等适用的条款存在冲突，不能自动选择某个版本。", evidence)
+        return _handoff(context, "policy_conflict", "这个问题适用的条款有不同版本，规定不一致，我不能自行选择。", evidence)
     if evidence["status"] == "clarification_needed":
         fields = evidence["missing_fields"]
         ask = "为确定适用条款，请补充：" + "、".join(FIELD_LABELS[f] for f in fields) + "。"
@@ -122,13 +121,13 @@ def consult_policy(state: dict, update, content: str, get_order, search, explain
         if evidence["status"] == "no_match" and not context.get("sku"):
             return _clarify(context, "未找到相关条款，请补充商品SKU或本人订单号。", ["sku"], evidence)
         if evidence["status"] == "no_match":
-            return _handoff(context, "no_match", "演示政策中没有找到能回答该问题的可靠条款"
+            return _handoff(context, "no_match", "现有政策中没有找到能回答这个问题的条款"
                             + ("（已换一种问法重新检索）" if context.get("requery") else "")
-                            + "，不能凭推测给出答复，已停止自动判断。", evidence)
-        return _handoff(context, evidence["status"], "未取得可用于回答的适用政策依据，已停止自动判断。", evidence)
+                            + "，我不能凭推测回答。", evidence)
+        return _handoff(context, evidence["status"], "暂时没有取得可用的政策依据，我不能凭推测回答。", evidence)
     answer = validate_answer(explain(question, evidence["policies"]), evidence["policies"])
     if answer["status"] == "no_answer":
-        return _handoff(context, "no_answer", "检索条款未覆盖所问事项，无法给出有依据的答案。", evidence)
+        return _handoff(context, "no_answer", "现有政策里没有找到对这个问题的明确规定，我不能凭推测回答。", evidence)
     context.pop("clarification_used", None)
     context.pop("search_attempts", None)
     return _result("policy_answered", notice + answer["text"] + "\n本次仅为咨询，未创建售后申请或执行退款。",
