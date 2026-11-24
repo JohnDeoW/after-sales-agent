@@ -9,17 +9,34 @@ import { renderTicketDetails } from "/static/support.js";
 import { renderWarehouseDetails } from "/static/event-controls.js";
 import { renderCard } from "/static/cards.js";
 
-// 示例诉求只填入输入框，不自动发送；字母对应欢迎页“演示导览”中的场景。
-const prompts = [
-  ["A 退 1 根数据线", "订单ORD-DEMO-002退1根数据线，买错了，未拆封。"],
-  ["B 质量问题退耳机", "订单ORD-DEMO-004耳机无法开机，质量原因退1件，已经拆封。"],
-  ["C 退鼠标", "订单ORD-DEMO-001退1件，不需要了，未拆封。"],
-  ["D 同款换货", "订单ORD-DEMO-002的ITEM-002键盘换1件，目标规格黑色，原因是想换颜色。"],
-  ["E 咨询退货期限", "订单ORD-DEMO-001普通退货几天内能退？"],
-  ["E 以旧换新", "订单ORD-DEMO-001的鼠标能以旧换新吗？"],
-  ["F 查询物流", "查询物流 ORD-DEMO-008"],
-  ["F 转人工", "转人工"],
-];
+// 输入框上方的通用快捷选项：随当前办理状态变化。send 直接发出；fill 只填入开头，由用户补充后发送。
+const quickOptions = {
+  idle: [["我要退货", { send: "我要退货" }], ["我要换货", { send: "我要换货" }], ["查物流", { send: "帮我查一下物流" }],
+    ["咨询政策", { fill: "我想咨询一下：" }], ["转人工", { send: "转人工" }]],
+  awaiting_confirmation: [["确认方案", { send: "确认此版本" }], ["修改方案", { modify: true }], ["取消办理", { send: "取消办理" }],
+    ["咨询政策", { fill: "确认前我想问一下：" }]],
+  confirmed: [["提交申请", { send: "可以，帮我提交" }], ["修改方案", { modify: true }], ["取消办理", { send: "取消办理" }]],
+};
+
+function renderQuickOptions(progress) {
+  const options = quickOptions[progress?.status] || quickOptions.idle;
+  $("#quick-prompts").replaceChildren(...options.map(([label, action]) => {
+    const button = el("button", label);
+    button.type = "button";
+    button.disabled = state.busy || !state.ready.customer;
+    button.addEventListener("click", () => {
+      if (state.busy) return;
+      if (action.modify) return onModify();
+      if (action.fill) {
+        input.value = action.fill;
+        input.focus();
+        return;
+      }
+      customerTask(() => send(action.send), "消息未完成处理，请先刷新记录核对结果；不会自动重发。");
+    });
+    return button;
+  }));
+}
 
 const layout = $("#customer-workspace");
 const messageList = $("#message-list");
@@ -264,6 +281,7 @@ export async function refreshConversation() {
   const exchange = exchanges.find(item => item.id === state.customer.exchange) || null;
   if (!exchange) state.customer.exchange = null;
   renderMessages(conversation.messages, progress);
+  renderQuickOptions(state.customer.focus === "case" ? progress : null);
   renderHeader(conversation, cases, progress, exchange, ticket);
   renderLists(cases, exchanges, tickets, conversation.case_id);
   renderPanel(progress, exchange, ticket);
@@ -342,17 +360,7 @@ export async function loadCustomer() {
 }
 
 export function initCustomer() {
-  $("#quick-prompts").replaceChildren(...prompts.map(([label, text]) => {
-    const button = el("button", label);
-    button.type = "button";
-    button.title = text;
-    button.addEventListener("click", () => {
-      if (state.busy) return;
-      input.value = text;
-      input.focus();
-    });
-    return button;
-  }));
+  renderQuickOptions(null);
   $("#message-form").addEventListener("submit", event => {
     event.preventDefault();
     const content = input.value.trim();

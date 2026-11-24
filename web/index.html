@@ -28,19 +28,19 @@
       <h2 class="tour-title">演示导览</h2>
       <ol class="tour">
         <li><strong>A 普通退货退款</strong><span class="tour-roles">客户 → 仓库 → 客户</span>
-          <p>示例诉求“退 1 根数据线”：确认方案、提交申请、寄回，仓库签收检验后模拟退款 33.33 元。</p></li>
+          <p>说“数据线买多了，退一根，还没拆”：确认方案、提交申请、寄回，仓库签收检验后模拟退款 33.33 元。</p></li>
         <li><strong>B 质量问题审批</strong><span class="tour-roles">客户 → 客服 → 仓库</span>
-          <p>“质量问题退耳机”：方案需客服审批，批准后按 A 寄回检验，退款 699 元。</p></li>
+          <p>说“耳机开不了机，想退”：方案需客服审批，批准后按 A 寄回检验，退款 699 元。</p></li>
         <li><strong>C 退款超时核对</strong><span class="tour-roles">客户 → 客服演示控制</span>
-          <p>“退鼠标”走到待退款，客服把退款设为“成功但响应超时”；客户核对原结果，不会重复退款。</p></li>
+          <p>退 ORD-DEMO-001 的鼠标走到待退款，客服把退款设为“成功但响应超时”；客户核对原结果，不会重复退款。</p></li>
         <li><strong>D 同款换货</strong><span class="tour-roles">客户 → 仓库</span>
-          <p>“同款换货”：键盘白换黑，确认时预留库存，仓库签收、检验、换新发货与送达。</p></li>
+          <p>说“键盘想换成黑色的”：确认时预留库存，仓库签收、检验、换新发货与送达。</p></li>
         <li><strong>E 政策咨询与拒答</strong><span class="tour-roles">客户</span>
-          <p>“咨询退货期限”给出引用条款；“以旧换新”是政策未覆盖的问题，应说明限制并转人工。</p></li>
+          <p>问“拆封了还能退吗”给出引用条款；问“能以旧换新吗”是政策未覆盖的问题，应说明限制并转人工。</p></li>
         <li><strong>F 物流与人工工单</strong><span class="tour-roles">客户 → 客服</span>
-          <p>“查询物流”看延迟件，“转人工”生成工单，客服在待办中回复。</p></li>
+          <p>问“我的鼠标怎么还没到”看延迟件，“转人工”生成工单，客服在待办中回复。</p></li>
       </ol>
-      <p class="muted tour-tip">客户页输入框上方的示例诉求按钮对应以上场景；完整步骤见测试指南。</p>
+      <p class="muted tour-tip">像真实顾客一样直接描述即可，不用记订单号；完整步骤见测试指南。</p>
     </div>
     <div id="identity-slot"></div>
   </section>
@@ -115,7 +115,7 @@
           <span class="spinner" aria-hidden="true"></span><span id="run-progress-text">正在处理…</span><span id="run-progress-time" class="muted"></span>
         </div>
         <form id="message-form" class="composer">
-          <div id="quick-prompts" class="quick-prompts" aria-label="示例诉求"></div>
+          <div id="quick-prompts" class="quick-prompts" aria-label="快捷选项"></div>
           <fieldset id="message-fields" disabled>
             <label for="message-input" class="visually-hidden">你的消息</label>
             <div class="composer-box">
