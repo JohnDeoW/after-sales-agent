@@ -105,7 +105,7 @@ function choice(card, ctx) {
     return node;
   }
   const options = items.map(item => {
-    const option = button("", () => ctx.act.choose(item.command), "choice-option");
+    const option = button("", () => ctx.act.choose(item.command, `选择：${item.text}`), "choice-option");
     option.append(el("span", item.text), el("small", item.hint));
     option.disabled = item.disabled;
     return option;
@@ -120,7 +120,7 @@ function intentChoice(card, ctx) {
     node.append(el("p", "这是之前的选项，请以最新回复为准。", "card-note"));
     return node;
   }
-  node.append(actionSet(...card.options.map(option => button(option.label, () => ctx.act.choose(option.command), "secondary"))));
+  node.append(actionSet(...card.options.map(option => button(option.label, () => ctx.act.choose(option.command, option.label), "secondary"))));
   return node;
 }
 

@@ -32,6 +32,8 @@ class CreateSession(BaseModel):
 class SendMessage(BaseModel):
     model_config = ConfigDict(extra="forbid")
     content: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=4000)]
+    # 页面卡片按钮发送固定指令时，用户气泡显示按钮文字（如所选商品名称）；路由仍按 content。
+    display: Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)] | None = None
 
 
 class ProposalDecision(BaseModel):
@@ -97,7 +99,7 @@ def current_session(service: Service, session_id: Session) -> dict:
 @router.post("/messages", status_code=201)
 def send_message(body: SendMessage, request: Request, session_id: Session) -> dict:
     """识别诉求、补全退货信息，并保存本轮用户消息和助手回复。"""
-    return request.app.state.workflow.receive(session_id, body.content)
+    return request.app.state.workflow.receive(session_id, body.content, display=body.display)
 
 
 @router.post("/messages/stream")
@@ -108,7 +110,7 @@ def stream_message(body: SendMessage, request: Request, service: Service, sessio
     def execute():
         # 在独立线程中消费 LangGraph 流：浏览器断开时这一轮仍会跑完，不会中断已开始的写入。
         try:
-            for event in request.app.state.workflow.stream(session_id, body.content):
+            for event in request.app.state.workflow.stream(session_id, body.content, display=body.display):
                 queue.put(event)
         except Exception as exc:
             # 项目自身的固定提示可以展示（如模型超时、预算停止）；未知异常文本可能含上游数据，只给通用提示。
@@ -207,19 +209,19 @@ def resume_case(case_id: str, service: Service, session_id: Session) -> dict:
 
 @router.post("/proposals/{proposal_id}/confirm")
 def confirm_proposal(proposal_id: str, body: ProposalDecision, request: Request, session_id: Session) -> dict:
-    return request.app.state.workflow.receive(session_id, f"确认方案 {proposal_id} v{body.version}",
+    return request.app.state.workflow.receive(session_id, f"确认方案 {proposal_id} v{body.version}", display="确认此版本方案",
                                                command={"action": "confirm", "proposal_id": proposal_id, "version": body.version})
 
 
 @router.post("/proposals/{proposal_id}/cancel")
 def cancel_proposal(proposal_id: str, body: ProposalDecision, request: Request, session_id: Session) -> dict:
-    return request.app.state.workflow.receive(session_id, f"取消方案 {proposal_id} v{body.version}",
+    return request.app.state.workflow.receive(session_id, f"取消方案 {proposal_id} v{body.version}", display="取消此方案",
                                                command={"action": "cancel", "proposal_id": proposal_id, "version": body.version})
 
 
 @router.post("/return-requests")
 def create_return_request(body: CreateReturnRequest, request: Request, session_id: Session) -> dict:
-    return request.app.state.workflow.receive(session_id, f"提交申请 {body.confirmation_id}",
+    return request.app.state.workflow.receive(session_id, f"提交申请 {body.confirmation_id}", display="提交退货申请",
                                                command={"action": "create_request", "confirmation_id": body.confirmation_id})
 
 

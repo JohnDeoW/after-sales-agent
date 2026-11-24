@@ -124,7 +124,7 @@ const cardActions = {
     statusLine.textContent = "换货申请已受理，请按右侧进度继续办理。";
     openPanel("case");
   }),
-  choose: command => customerTask(() => send(command), "选择未完成处理，请先刷新记录核对结果；不会自动重发。"),
+  choose: (command, label) => customerTask(() => send(command, label), "选择未完成处理，请先刷新记录核对结果；不会自动重发。"),
   openRecord: card => customerTask(async () => {
     if (card.kind === "exchange_request") state.customer = { ...state.customer, focus: "exchange", exchange: card.id };
     else if (card.kind === "ticket") state.customer = { ...state.customer, focus: "ticket", ticket: card.id };
@@ -305,9 +305,9 @@ function hideProgress() {
   $("#run-progress").hidden = true;
 }
 
-async function send(content) {
+async function send(content, display = null) {
   messageList.querySelector(".empty")?.remove();
-  messageList.append(messageNode({ role: "user", content }, "pending"));
+  messageList.append(messageNode({ role: "user", content: display || content }, "pending"));
   let draft = null;
   messageList.scrollTop = messageList.scrollHeight;
   input.value = "";
@@ -324,11 +324,11 @@ async function send(content) {
         draft.querySelector("p").textContent += text;
         messageList.scrollTop = messageList.scrollHeight;
       },
-    });
+    }, display);
     await refreshConversation();
     statusLine.textContent = "回复已保存。";
   } catch (failure) {
-    input.value = content; // 失败时保留原文，方便核对后再发。
+    if (!display) input.value = content; // 失败时保留原文，方便核对后再发（按钮操作不回填指令）。
     throw failure;
   } finally { hideProgress(); }
 }

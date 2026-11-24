@@ -230,8 +230,9 @@ export function renderTrace(value, progress = null) {
 export const stepLabel = label;
 
 // hooks.onStep(event) 在每个节点或工具开始/结束时调用；hooks.onDraft(text) 接收政策答复草稿增量。
-export async function streamMessage(content, hooks = {}) {
-  const response = await fetch("/messages/stream", { method: "POST", credentials: "same-origin", headers: roleHeaders({ "Content-Type": "application/json" }), body: JSON.stringify({ content }) });
+// display：用户气泡显示的文字（卡片按钮为按钮上的文字）；路由仍按 content。
+export async function streamMessage(content, hooks = {}, display = null) {
+  const response = await fetch("/messages/stream", { method: "POST", credentials: "same-origin", headers: roleHeaders({ "Content-Type": "application/json" }), body: JSON.stringify(display ? { content, display } : { content }) });
   if (!response.ok) throw new Error("消息请求未接受，请核对身份并刷新记录。");
   renderTrace(null);
   let buffer = "", completed = false;

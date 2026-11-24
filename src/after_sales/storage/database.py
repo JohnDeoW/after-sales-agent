@@ -26,6 +26,10 @@ def initialize_session_storage(path: Path = DEMO_DB_PATH) -> None:
         columns = {row["name"] for row in connection.execute("PRAGMA table_info(messages)")}
         if "card_json" not in columns:
             connection.execute("ALTER TABLE messages ADD COLUMN card_json TEXT")
+        if "case_id" not in columns:
+            # 消息归属案件：打开案件时按案件读取它自己的往来消息。
+            connection.execute("ALTER TABLE messages ADD COLUMN case_id TEXT")
+        connection.execute("CREATE INDEX IF NOT EXISTS idx_messages_case ON messages(case_id, id)")
         columns = {row["name"] for row in connection.execute("PRAGMA table_info(conversation_states)")}
         if "history_start_id" not in columns:
             connection.execute("ALTER TABLE conversation_states ADD COLUMN history_start_id INTEGER NOT NULL DEFAULT 0")
@@ -69,13 +73,16 @@ def read_order(connection: sqlite3.Connection, order_id: str) -> dict | None:
 
 def append_messages(connection: sqlite3.Connection, session_id: str, content: str, reply: str,
                     card: dict | None = None) -> dict:
-    """保存用户消息与助手回复；card 是助手回复附带的结构化卡片快照。"""
+    """保存用户消息与助手回复；card 是助手回复附带的结构化卡片快照。
+    消息记入会话当前所在的案件（本轮保存后的指针），打开该案件时可看到它自己的往来消息。"""
+    pointer = connection.execute("SELECT case_id FROM conversation_states WHERE session_id = ?", (session_id,)).fetchone()
+    case_id = pointer["case_id"] if pointer else None
     saved = []
     for role, text, card_json in (("user", content, None),
                                   ("assistant", reply, json.dumps(card, ensure_ascii=False) if card else None)):
         cursor = connection.execute(
-            "INSERT INTO messages (session_id, role, content, card_json) VALUES (?, ?, ?, ?)",
-            (session_id, role, text, card_json),
+            "INSERT INTO messages (session_id, role, content, card_json, case_id) VALUES (?, ?, ?, ?, ?)",
+            (session_id, role, text, card_json, case_id),
         )
         saved.append(message_view(connection.execute(
             "SELECT id, role, content, created_at, card_json FROM messages WHERE id = ?", (cursor.lastrowid,),

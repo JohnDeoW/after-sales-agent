@@ -48,3 +48,4 @@ class TurnContext:
     content: str
     deps: Any  # AfterSalesWorkflow：业务服务、模型步骤与预算
     trace: Any  # 本轮的 TraceHandler
+    display: str = ""  # 保存为用户消息的文字（按钮操作为按钮文字）；为空时用 content

@@ -108,10 +108,19 @@ class CustomerService:
                 """SELECT c.id FROM conversation_states s JOIN cases c ON c.id = s.case_id
                    WHERE s.session_id = ? AND c.user_id = ?""", (session_id, user["id"]),
             ).fetchone()
-            rows = connection.execute(
-                "SELECT id, role, content, created_at, card_json FROM messages WHERE session_id = ? ORDER BY id",
-                (session_id,),
-            ).fetchall()
+            if active:
+                rows = connection.execute(
+                    """SELECT m.id, m.role, m.content, m.created_at, m.card_json FROM messages m
+                       JOIN sessions s ON s.id = m.session_id
+                       WHERE m.case_id = ? AND s.user_id = ? ORDER BY m.id""", (active["id"], user["id"]),
+                ).fetchall()
+            else:
+                start = connection.execute("SELECT history_start_id FROM conversation_states WHERE session_id = ?",
+                                           (session_id,)).fetchone()
+                rows = connection.execute(
+                    "SELECT id, role, content, created_at, card_json FROM messages WHERE session_id = ? AND id >= ? ORDER BY id",
+                    (session_id, start["history_start_id"] if start else 0),
+                ).fetchall()
             messages = [message_view(row) for row in rows]
             for message in messages:
                 if message["card"] and message["card"]["type"] in ("return_proposal", "exchange_proposal", "record"):

@@ -8,7 +8,7 @@ from after_sales.domain.authorizations import valid
 from after_sales.domain.approvals import approval_view
 from after_sales.domain.return_requests import REQUEST_SELECT, request_view, request_text
 from after_sales.domain.returns import evaluate_return
-from after_sales.storage.database import connect_database, append_messages, read_order
+from after_sales.storage.database import connect_database, read_order
 from after_sales.storage.tickets import ticket_summaries
 from after_sales.storage.case_progress import save_pointer
 
@@ -160,9 +160,6 @@ class CaseService:
             connection.execute("BEGIN IMMEDIATE")
             user = _session_user(connection, session_id)
             progress = read_progress(connection, user["id"], case_id)
-            # 只切换会话指针；下一轮工作流发现案件变化后从案件进度读取草稿。
+            # 只切换会话指针；页面随后显示该案件自己的往来消息，下一轮工作流从案件进度读取草稿。
             save_pointer(connection, session_id, case_id)
-            # 给切换案件后的下一轮留下明确的会话边界，不重新执行图或业务写操作。
-            append_messages(connection, session_id, f"恢复案件 {case_id}",
-                            "已恢复。" + progress["summary"])
             return progress

@@ -119,14 +119,14 @@ class AfterSalesWorkflow:
         return snapshot.interrupts[0].value if snapshot.interrupts else None
 
     # ---- 对外入口 ----
-    def receive(self, session_id: str, content: str, *, command: dict | None = None) -> dict:
+    def receive(self, session_id: str, content: str, *, command: dict | None = None, display: str | None = None) -> dict:
         result = None
-        for event in self.stream(session_id, content, command=command):
+        for event in self.stream(session_id, content, command=command, display=display):
             if event["type"] == "result":
                 result = event["data"]
         return result
 
-    def stream(self, session_id: str, content: str, *, command: dict | None = None) -> Iterator[dict]:
+    def stream(self, session_id: str, content: str, *, command: dict | None = None, display: str | None = None) -> Iterator[dict]:
         """运行一轮并逐步产出页面事件：trace（轨迹快照）、reply_delta（答复草稿）、result（最终结果）。"""
         user = self.customers.current_user(session_id)
         pending = self.pending(session_id)
@@ -136,7 +136,7 @@ class AfterSalesWorkflow:
             # 暂停中的会话：按钮指令或新消息都作为恢复值，由等待节点核对版本后继续。
             graph_input = Command(resume={"action": (command or {}).get("action", "message"), **(command or {})},
                                   update=turn_input(command))
-        yield from self._run(session_id, user, content, graph_input)
+        yield from self._run(session_id, user, content, graph_input, display)
 
     def resume_approval(self, request_id: str, decision: str) -> None:
         """客服审批写入后，恢复正在等待这份申请审批的客户会话。"""
@@ -160,11 +160,12 @@ class AfterSalesWorkflow:
                 logger.warning("审批后恢复会话等待点失败：%s", session_id)
 
     # ---- 运行与失败处理 ----
-    def _run(self, session_id, user, content, graph_input) -> Iterator[dict]:
+    def _run(self, session_id, user, content, graph_input, display=None) -> Iterator[dict]:
         trace = TraceHandler(self.limits)
         config = self.config(session_id, trace, self.limits)
         start = deepcopy(self.graph.get_state(self.config(session_id)).values)
-        context = TurnContext(session_id=session_id, user=user, content=content, deps=self, trace=trace)
+        display = display or content
+        context = TurnContext(session_id=session_id, user=user, content=content, deps=self, trace=trace, display=display)
         preview = DraftPreview()
         try:
             for mode, chunk in self.graph.stream(graph_input, config, context=context,
@@ -176,7 +177,7 @@ class AfterSalesWorkflow:
                     if text:
                         yield {"type": "reply_delta", "text": text, "provisional": True}
         except Exception as exc:
-            yield from self._handle_failure(exc, session_id, user, content, trace, start)
+            yield from self._handle_failure(exc, session_id, user, display, trace, start)
             return
         for event in trace.drain():
             yield {"type": "trace", "run_id": trace.id, "event": event}

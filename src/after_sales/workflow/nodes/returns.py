@@ -121,7 +121,7 @@ def persist_turn(s: State, runtime: Runtime[TurnContext]) -> dict:
                 result["failure_handoff"] = {"reason_code": "clarification_budget", "workflow": ctx.trace.view("stopped")}
     else:
         state.pop("clarification_budget", None)
-    response = save_turn(ctx.deps.customers.db_path, ctx.session_id, ctx.user["id"], ctx.content,
+    response = save_turn(ctx.deps.customers.db_path, ctx.session_id, ctx.user["id"], ctx.display or ctx.content,
                          s["context"], result, s["case_fields"])
     return {"result": response, "response": response, "conversation": state}
 

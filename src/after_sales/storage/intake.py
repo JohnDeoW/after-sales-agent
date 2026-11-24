@@ -43,10 +43,16 @@ def load_context(path: Path, session_id: str, snapshot: dict | None = None) -> d
             state = json.loads(row["state_json"])  # 检查点上线前保存的旧会话
         else:
             state = deepcopy(DEFAULT_STATE)
-        history = connection.execute(
-            "SELECT id, role, content FROM messages WHERE session_id = ? AND id >= ? ORDER BY id DESC LIMIT 6",
-            (session_id, row["history_start_id"] if row else 0),
-        ).fetchall()
+        if case_id:
+            history = connection.execute(
+                """SELECT m.id, m.role, m.content FROM messages m JOIN sessions s ON s.id = m.session_id
+                   WHERE m.case_id = ? AND s.user_id = ? ORDER BY m.id DESC LIMIT 6""", (case_id, user["id"]),
+            ).fetchall()
+        else:
+            history = connection.execute(
+                "SELECT id, role, content FROM messages WHERE session_id = ? AND id >= ? ORDER BY id DESC LIMIT 6",
+                (session_id, row["history_start_id"] if row else 0),
+            ).fetchall()
         progress = connection.execute(
             """SELECT p.revision, p.missing_fields_json, c.status, c.summary FROM case_progress p
                JOIN cases c ON c.id = p.case_id WHERE p.case_id = ? AND c.user_id = ?""",
@@ -119,6 +125,11 @@ def save_turn(path: Path, session_id: str, user_id: str, content: str,
                     "INSERT INTO cases (id, user_id, intent, status) VALUES (?, ?, 'return', 'collecting_information')",
                     (case_id, user_id),
                 )
+                # 建案前的开场对话（如先描述问题、找订单）归入新案件，打开案件时能看到完整来龙去脉。
+                start = connection.execute("SELECT history_start_id FROM conversation_states WHERE session_id = ?",
+                                           (session_id,)).fetchone()
+                connection.execute("UPDATE messages SET case_id = ? WHERE session_id = ? AND case_id IS NULL AND id >= ?",
+                                   (case_id, session_id, start["history_start_id"] if start else 0))
             sync_proposal(connection, case_id, context["state"], result)
             connection.execute(
                 """UPDATE cases SET order_id = ?, order_item_id = ?, quantity = ?, reason = ?,

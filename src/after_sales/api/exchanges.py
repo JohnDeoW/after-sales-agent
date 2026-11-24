@@ -12,7 +12,7 @@ router = APIRouter()
 
 @router.post("/exchange-proposals/{proposal_id}/confirm")
 def confirm_exchange(proposal_id: str, body: ProposalDecision, request: Request, session_id: Session):
-    return request.app.state.workflow.receive(session_id, f"确认换货 {proposal_id} v{body.version}",
+    return request.app.state.workflow.receive(session_id, f"确认换货 {proposal_id} v{body.version}", display="确认换货方案",
         command={"action": "confirm_exchange", "proposal_id": proposal_id, "version": body.version})
 
 
